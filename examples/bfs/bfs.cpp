@@ -234,8 +234,8 @@ int main(int argc, char *argv[]) {
                    [=](sycl::nd_item<1> item) { 
                       int glob_id = item.get_global_id();
                       int loc_id = item.get_local_id();
-                      //for (unsigned int i = glob_id; i < data_size; i += num_work_items)
-                        dist_i[glob_id] = degree_i[glob_id]; 
+                      for (unsigned int i = loc_id; i < work_group_size; i += 1)
+                        dist_i[glob_id+i] = degree_i[glob_id+i]; 
                     });
   };
 
