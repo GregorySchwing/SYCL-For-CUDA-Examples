@@ -229,8 +229,8 @@ int main(int argc, char *argv[]) {
     // dist
     auto dist_i = dist.get_access<read_write_t>(h);
 
-    //h.parallel_for_work_group(sycl::range<1>(num_work_items), sycl::range<1>(work_group_size),
-    h.parallel_for_work_group(sycl::nd_range<1>(num_work_items, work_group_size),
+    h.parallel_for_work_group(sycl::range<1>(num_work_items), sycl::range<1>(work_group_size),
+    //h.parallel_for_work_group(sycl::nd_range<1>(num_work_items, work_group_size),
                    [=](sycl::nd_item<1> item) { 
                       int glob_id = item.get_global_id();
                       int loc_id = item.get_local_id();
