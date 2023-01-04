@@ -231,7 +231,12 @@ int main(int argc, char *argv[]) {
 
     h.parallel_for_work_group(sycl::range<1>(num_work_items), 
                     sycl::range<1>(work_group_size),
-                   [=](sycl::id<1> i) { dist_i[i] = degree_i[i]; });
+                   [=](sycl::nd_item<1> item) { 
+                      int glob_id = item.get_global_id();
+                      int loc_id = item.get_local_id();
+                      //for (unsigned int i = glob_id; i < data_size; i += num_work_items)
+                        dist_i[glob_id] = degree_i[glob_id]; 
+                    });
   };
 
   myQueue.submit(cg2);
@@ -241,7 +246,7 @@ int main(int argc, char *argv[]) {
     auto h_e = dist.get_access<read_t>();
     double sum = 0.0f;
     for (int i = 0; i < graph.vertexNum; i++) {
-      printf("%d ",h_e[i] );
+      //printf("%d ",h_e[i] );
       sum += h_e[i];
     }
     std::cout << "Sum2 is : " << sum << std::endl;
