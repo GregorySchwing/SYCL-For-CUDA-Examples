@@ -41,7 +41,7 @@ void reduction(sycl::queue &q, std::vector<int> &data, std::vector<int> &flush,
   sycl::buffer<int> flush_buf(flush.data(), flush_size, props);
   sycl::buffer<int> sum_buf(&sum, 1, props);
 
-  init_data(q, buf, data_size);
+  //init_data(q, buf, data_size);
 
   double elapsed = 0;
   for (int i = 0; i < iter; i++) {
@@ -56,7 +56,7 @@ void reduction(sycl::queue &q, std::vector<int> &data, std::vector<int> &flush,
       h.parallel_for(flush_size, [=](auto index) { flush_acc[index] = 1; });
     });
 
-    Timer timer;
+    //Timer timer;
     // reductionMapToHWVector main begin
     q.submit([&](auto &h) {
       sycl::accessor buf_acc(buf, h, sycl::read_only);
@@ -97,7 +97,7 @@ void reduction(sycl::queue &q, std::vector<int> &data, std::vector<int> &flush,
   }
   elapsed = elapsed / iter;
   std::string msg = "with work-groups=" + std::to_string(work_group_size);
-  check_result(elapsed, msg, sum);
+  //check_result(elapsed, msg, sum);
 } // reduction end
 
 int main(int argc, char *argv[]) {
@@ -110,18 +110,19 @@ int main(int argc, char *argv[]) {
   CSRGraph graph = createCSRGraphFromFile(config.graphFileName);
   performChecks(graph, config);
   printf("finished checking\n");
-  constexpr const size_t start = 1;
+  constexpr const size_t startSz = 1;
+
   const sycl::range RowSize{graph.vertexNum+1};
   const sycl::range ColSize{graph.edgeNum*2};
   const sycl::range VertexSize{graph.vertexNum};
-  const sycl::range StartSize{start};
+  const sycl::range StartSize{startSz};
 
   // Device input vectors
   sycl::buffer<unsigned int> rows{graph.srcPtr, RowSize};
   sycl::buffer<unsigned int> cols{graph.dst, ColSize};
   sycl::buffer<int> degree{graph.degree, VertexSize};
 
-  // Device intermediate vector
+  // Device intermediate vectorstart
   // Frontier
   sycl::buffer<bool> frontier{VertexSize};
 
