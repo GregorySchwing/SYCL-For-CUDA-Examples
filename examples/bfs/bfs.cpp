@@ -71,7 +71,7 @@ int main(int argc, char *argv[]) {
       if(!h_f[0] && h_c[i]) h_f[0] = i;
     }
 
-      std::cout << " start " h_f[0] << " degree " << h_c[h_f[0]] << std::endl;
+      std::cout << " start " << h_f[0] << " degree " << h_c[h_f[0]] << std::endl;
 
   }
 
