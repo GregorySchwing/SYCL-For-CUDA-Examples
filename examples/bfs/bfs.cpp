@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
     auto c = bufC.get_access<read_t>(h);
     auto e = bufE.get_access<write_t>(h);
 
-    h.parallel_for(VecSize,
+    h.parallel_for(VertexSize,
                    [=](sycl::id<1> i) { e[i] = c[i]; });
   };
 
