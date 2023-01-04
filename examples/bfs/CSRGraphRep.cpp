@@ -1,12 +1,6 @@
 
 #include "CSRGraphRep.h"
 
-#include <stdio.h>
-#include <stdint.h>
-#include <cstdlib>
-#include <iostream>
-#include <fstream>
-#include <assert.h>
 using namespace std;
 
 void CSRGraph::create(unsigned int xn,unsigned int xm){
