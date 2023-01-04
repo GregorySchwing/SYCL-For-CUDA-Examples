@@ -212,8 +212,7 @@ int main(int argc, char *argv[]) {
   }
 
   int work_group_size = 2;
-  int data_size = graph.vertexNum;
-  int num_work_items = data_size / work_group_size;
+  int num_work_groups = graph.vertexNum;
 
   // Command Group creation
   auto cg2 = [&](sycl::handler &h) {    
@@ -229,13 +228,10 @@ int main(int argc, char *argv[]) {
     // dist
     auto dist_i = dist.get_access<read_write_t>(h);
 
-    h.parallel_for_work_group(sycl::range<1>(num_work_items), sycl::range<1>(work_group_size),
-                   [=](sycl::nd_item<1> item) { 
-                      int glob_id = item.get_global_id();
-                      int loc_id = item.get_local_id();
-                      for (unsigned int i = loc_id; i < work_group_size; i += 1)
-                        dist_i[glob_id+i] += degree_i[glob_id+i]; 
-                    });
+    h.parallel_for(sycl::nd_range<1>{num_work_groups, work_group_size}, [=](sycl::nd_item<1> item) {
+                      int i = item.get_global_id(0);
+                      dist_i[i] += degree_i[i]; 
+    });
   };
 
   myQueue.submit(cg2);
