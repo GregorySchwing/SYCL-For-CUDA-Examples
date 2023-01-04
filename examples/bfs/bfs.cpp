@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
 
   CSRGraph graph = createCSRGraphFromFile(config.graphFileName);
   performChecks(graph, config);
-
+  printf("finished checking\n");
   constexpr const size_t N = 100000;
   const sycl::range RowSize{graph.vertexNum+1};
   const sycl::range ColSize{graph.edgeNum*2};
