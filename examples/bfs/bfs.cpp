@@ -23,6 +23,7 @@
 #include <vector>
 #include "config.h"
 #include "CSRGraphRep.h"
+#include "auxFunctions.h"
 
 #include <CL/sycl.hpp>
 
