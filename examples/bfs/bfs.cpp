@@ -37,10 +37,11 @@ int main(int argc, char *argv[]) {
   CSRGraph graph = createCSRGraphFromFile(config.graphFileName);
   performChecks(graph, config);
   printf("finished checking\n");
-  constexpr const size_t N = 100000;
+  constexpr const size_t start = 1;
   const sycl::range RowSize{graph.vertexNum+1};
   const sycl::range ColSize{graph.edgeNum*2};
   const sycl::range VertexSize{graph.vertexNum};
+  const sycl::range StartSize{start};
 
   // Device input vectors
   sycl::buffer<unsigned int> bufA{graph.srcPtr, RowSize};
@@ -53,14 +54,25 @@ int main(int argc, char *argv[]) {
   // Device output vector
   sycl::buffer<int> bufE{VertexSize};
 
+  sycl::buffer<int> bufF{StartSize};
+
   // Initialize input data
   {
+    const auto read_t = sycl::access::mode::read;
     const auto dwrite_t = sycl::access::mode::discard_write;
-
+    const auto read_write_t = sycl::access::mode::read_write;
+    auto h_c = bufC.get_access<read_t>();
+    auto h_d = bufD.get_access<dwrite_t>();
     auto h_e = bufE.get_access<dwrite_t>();
+    auto h_f = bufF.get_access<read_write_t>();
     for (int i = 0; i < graph.vertexNum; i++) {
+      h_d[i] = 0;
       h_e[i] = 0;
+      if(!h_f[0] && h_c[i]) h_f[0] = i;
     }
+
+      std::cout << " start " h_f[0] << " degree " << h_c[h_f[0]] << std::endl;
+
   }
 
   auto CUDASelector = [](sycl::device const &dev) {
