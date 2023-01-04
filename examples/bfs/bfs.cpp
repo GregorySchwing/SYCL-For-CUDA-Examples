@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
     const auto dwrite_t = sycl::access::mode::discard_write;
 
     auto h_e = bufE.get_access<dwrite_t>();
-    for (int i = 0; i < N; i++) {
+    for (int i = 0; i < graph.vertexNum; i++) {
       h_e[i] = 0;
     }
   }
