@@ -1,4 +1,3 @@
-#include <assert.h>
 #include "CSRGraphRep.h"
 
 int comp(const void *elem1, const void *elem2)

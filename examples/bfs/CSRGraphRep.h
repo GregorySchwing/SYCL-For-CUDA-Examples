@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <fstream>
+#include <assert.h>
 
 struct CSRGraph{
     unsigned int vertexNum; // Number of Vertices
