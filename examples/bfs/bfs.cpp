@@ -242,13 +242,14 @@ int main(int argc, char *argv[]) {
 
     auto rows_i = rows.get_access<read_t>(h);
     auto cols_i = cols.get_access<read_t>(h);
+    auto degree_i = degree.get_access<read_t>(h);
 
     auto frontier_i = frontier.get_access<read_t>(h);
     // dist
     auto dist_i = dist.get_access<read_write_t>(h);
 
     h.parallel_for(VertexSize,
-                   [=](sycl::id<1> i) { if(frontier_i[i]) dist_i[i] = dist_i[i]; });
+                   [=](sycl::id<1> i) { dist_i[i] = degree_i[i]; });
   };
 
   myQueue.submit(cg);
