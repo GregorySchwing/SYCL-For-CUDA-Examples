@@ -27,8 +27,11 @@
 
 #include <CL/sycl.hpp>
 
-void reduction(sycl::queue &q, std::vector<int> &data, std::vector<int> &flush,
-               int iter, int work_group_size) {
+void reduction(sycl::queue &q, 
+                std::vector<int> &data, 
+                std::vector<int> &flush,
+                int iter, 
+                int work_group_size) {
   const size_t data_size = data.size();
   const size_t flush_size = flush.size();
   int sum = 0;
@@ -66,29 +69,29 @@ void reduction(sycl::queue &q, std::vector<int> &data, std::vector<int> &flush,
       sycl::accessor sum_acc(sum_buf, h, sycl::write_only, sycl::no_init);
 
       h.parallel_for(
-          sycl::nd_range<1>(num_work_items, work_group_size),
-          [=](sycl::nd_item<1> item) [[intel::reqd_sub_group_size(16)]] {
-            auto v =
-                sycl::atomic_ref<int, sycl::memory_order::relaxed,
-                                 sycl::memory_scope::device,
-                                 sycl::access::address_space::global_space>(
-                    sum_acc[0]);
-            int sum = 0;
-            int glob_id = item.get_global_id();
-            int loc_id = item.get_local_id();
-            for (unsigned int i = glob_id; i < data_size; i += num_work_items)
-              sum += buf_acc[i];
-            scratch[loc_id] = sum;
+        sycl::nd_range<1>(num_work_items, work_group_size),
+        [=](sycl::nd_item<1> item) [[intel::reqd_sub_group_size(16)]] {
+          auto v =
+              sycl::atomic_ref<int, sycl::memory_order::relaxed,
+                                sycl::memory_scope::device,
+                                sycl::access::address_space::global_space>(
+                  sum_acc[0]);
+          int sum = 0;
+          int glob_id = item.get_global_id();
+          int loc_id = item.get_local_id();
+          for (unsigned int i = glob_id; i < data_size; i += num_work_items)
+            sum += buf_acc[i];
+          scratch[loc_id] = sum;
 
-            for (int i = work_group_size / 2; i > 0; i >>= 1) {
-              item.barrier(sycl::access::fence_space::local_space);
-              if (loc_id < i)
-                scratch[loc_id] += scratch[loc_id + i];
-            }
+          for (int i = work_group_size / 2; i > 0; i >>= 1) {
+            item.barrier(sycl::access::fence_space::local_space);
+            if (loc_id < i)
+              scratch[loc_id] += scratch[loc_id + i];
+          }
 
-            if (loc_id == 0)
-              v.fetch_add(scratch[0]);
-          });
+          if (loc_id == 0)
+            v.fetch_add(scratch[0]);
+      });
     });
     q.wait();
     //elapsed += timer.Elapsed();
@@ -134,6 +137,9 @@ int main(int argc, char *argv[]) {
   // Depth
   sycl::buffer<int> depth{StartSize};
 
+
+  int numBlocks = graph.vertexNum;
+  int threadsPerBlock = 32;
   // Initialize input data
   {
     const auto read_t = sycl::access::mode::read;
@@ -164,6 +170,69 @@ int main(int argc, char *argv[]) {
     }
   };
   sycl::queue myQueue{CUDASelector};
+
+  /*
+
+  // Command Group creation
+  auto cg = [&](sycl::handler &h) {    
+    const auto read_t = sycl::access::mode::read;
+    const auto read_write_t = sycl::access::mode::read_write;
+    const auto dwrite_t = sycl::access::mode::discard_write;
+
+    auto rows_i = rows.get_access<read_t>(h);
+    auto cols_i = cols.get_access<read_t>(h);
+
+    auto frontier_i = frontier.get_access<read_t>(h);
+    // dist
+    auto dist_i = dist.get_access<read_write_t>(h);
+
+    h.parallel_for(VertexSize,
+                   [=](sycl::id<1> i) { if(frontier_i[i]) dist_i[i] = dist_i[i]; });
+
+
+    sycl::accessor<int, 1, sycl::access::mode::read_write,
+                    sycl::access::target::local>
+        scratch(work_group_size, h);
+
+    h.parallel_for(
+      // sycl::nd_range<dimension>
+      // sycl::nd_range<1>(num_work_items, work_group_size),
+
+      sycl::nd_range<1>(numBlocks, threadsPerBlock),
+      [=](sycl::nd_item<1> item) [[intel::reqd_sub_group_size(16)]] {
+        auto v =
+            sycl::atomic_ref<int, sycl::memory_order::relaxed,
+                              sycl::memory_scope::device,
+                              sycl::access::address_space::global_space>(
+                sum_acc[0]);
+        int sum = 0;
+        int glob_id = item.get_global_id();
+        int loc_id = item.get_local_id();
+        for (unsigned int i = glob_id; i < data_size; i += num_work_items)
+          sum += buf_acc[i];
+        scratch[loc_id] = sum;
+
+        for (int i = work_group_size / 2; i > 0; i >>= 1) {
+          item.barrier(sycl::access::fence_space::local_space);
+          if (loc_id < i)
+            scratch[loc_id] += scratch[loc_id + i];
+        }
+
+        if (loc_id == 0)
+          v.fetch_add(scratch[0]);
+    });
+  };
+
+  {
+    const auto read_t = sycl::access::mode::read;
+    auto h_e = dist.get_access<read_t>();
+    double sum = 0.0f;
+    for (int i = 0; i < graph.vertexNum; i++) {
+      sum += h_e[i];
+    }
+    std::cout << "Sum is : " << sum << std::endl;
+  }
+  */
 
   // Command Group creation
   auto cg = [&](sycl::handler &h) {    
