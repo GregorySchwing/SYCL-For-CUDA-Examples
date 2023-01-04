@@ -19,7 +19,7 @@ set(SYCL_FLAGS "-fsycl"
       "-Wno-linker-warnings")
 
       # Build the SYCL code
-add_executable (sycl_bfs bfs.cpp CSRGraphRep.cpp)
+add_executable (sycl_bfs bfs.cpp CSRGraphRep.cpp auxFunctions.cpp)
 target_compile_features(sycl_bfs PUBLIC cxx_std_17)
 target_compile_options(sycl_bfs PUBLIC ${SYCL_FLAGS})
 target_link_libraries(sycl_bfs PUBLIC ${SYCL_FLAGS})
