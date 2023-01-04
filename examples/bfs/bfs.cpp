@@ -26,9 +26,9 @@
 #include "auxFunctions.h"
 
 #include <CL/sycl.hpp>
-
+/*
 void reduction(sycl::queue &q, 
-                std::vector<int> &data, 
+                sycl::buffer<int> &dist, 
                 std::vector<int> &flush,
                 int iter, 
                 int work_group_size) {
@@ -102,7 +102,7 @@ void reduction(sycl::queue &q,
   std::string msg = "with work-groups=" + std::to_string(work_group_size);
   //check_result(elapsed, msg, sum);
 } // reduction end
-
+*/
 int main(int argc, char *argv[]) {
 
   Config config = parseArgs(argc,argv);
@@ -199,6 +199,46 @@ int main(int argc, char *argv[]) {
       sum += h_e[i];
     }
     std::cout << "Sum is : " << sum << std::endl;
+  }
+
+  // Initialize input data
+  {
+    const auto dwrite_t = sycl::access::mode::discard_write;
+    auto h_e = dist.get_access<dwrite_t>();
+
+    for (int i = 0; i < graph.vertexNum; i++) {
+      h_e[i] = 0;
+    }
+  }
+
+  // Command Group creation
+  auto cg2 = [&](sycl::handler &h) {    
+    const auto read_t = sycl::access::mode::read;
+    const auto read_write_t = sycl::access::mode::read_write;
+    const auto dwrite_t = sycl::access::mode::discard_write;
+
+    auto rows_i = rows.get_access<read_t>(h);
+    auto cols_i = cols.get_access<read_t>(h);
+    auto degree_i = degree.get_access<read_t>(h);
+
+    auto frontier_i = frontier.get_access<read_t>(h);
+    // dist
+    auto dist_i = dist.get_access<read_write_t>(h);
+
+    h.parallel_for_work_group(VertexSize,
+                   [=](sycl::id<1> i) { dist_i[i] = degree_i[i]; });
+  };
+
+  myQueue.submit(cg2);
+
+  {
+    const auto read_t = sycl::access::mode::read;
+    auto h_e = dist.get_access<read_t>();
+    double sum = 0.0f;
+    for (int i = 0; i < graph.vertexNum; i++) {
+      sum += h_e[i];
+    }
+    std::cout << "Sum2 is : " << sum << std::endl;
   }
 
   return 0;
