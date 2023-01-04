@@ -241,6 +241,7 @@ int main(int argc, char *argv[]) {
     auto h_e = dist.get_access<read_t>();
     double sum = 0.0f;
     for (int i = 0; i < graph.vertexNum; i++) {
+      printf("%d ",h_e[i] );
       sum += h_e[i];
     }
     std::cout << "Sum2 is : " << sum << std::endl;
