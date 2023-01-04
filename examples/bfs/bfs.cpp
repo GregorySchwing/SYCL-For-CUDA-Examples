@@ -211,6 +211,10 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  int work_group_size = 2;
+  int data_size = graph.vertexNum;
+  int num_work_items = data_size / work_group_size;
+
   // Command Group creation
   auto cg2 = [&](sycl::handler &h) {    
     const auto read_t = sycl::access::mode::read;
@@ -225,7 +229,8 @@ int main(int argc, char *argv[]) {
     // dist
     auto dist_i = dist.get_access<read_write_t>(h);
 
-    h.parallel_for_work_group(VertexSize,
+    h.parallel_for_work_group(sycl::range<1>(num_work_items), 
+                    sycl::range<1>(work_group_size),
                    [=](sycl::id<1> i) { dist_i[i] = degree_i[i]; });
   };
 
