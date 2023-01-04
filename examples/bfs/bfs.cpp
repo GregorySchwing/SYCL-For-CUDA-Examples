@@ -91,7 +91,7 @@ void reduction(sycl::queue &q, std::vector<int> &data, std::vector<int> &flush,
           });
     });
     q.wait();
-    elapsed += timer.Elapsed();
+    //elapsed += timer.Elapsed();
     sycl::host_accessor h_acc(sum_buf);
     sum = h_acc[0];
   }
@@ -179,7 +179,7 @@ int main(int argc, char *argv[]) {
     auto dist_i = dist.get_access<read_write_t>(h);
 
     h.parallel_for(VertexSize,
-                   [=](sycl::id<1> i) { if(frontier_i[i]) e[i] = c[i]; });
+                   [=](sycl::id<1> i) { if(frontier_i[i]) dist_i[i] = dist_i[i]; });
   };
 
   myQueue.submit(cg);
