@@ -190,7 +190,7 @@ int main(int argc, char *argv[]) {
 
   {
     const auto write_t = sycl::access::mode::write;
-    auto exp = expanded.get_access<read_t>();
+    auto exp = expanded.get_access<write_t>();
     exp[0] = false;
   }
 
