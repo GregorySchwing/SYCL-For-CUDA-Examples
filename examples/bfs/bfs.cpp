@@ -151,7 +151,7 @@ int main(int argc, char *argv[]) {
       // Found an elibible start
       // Set its distance to itself as 0
       // Set the start vertex
-      if(!s[0] && d[i]){ 
+      if(!s[0] && deg[i]){ 
         d[i] = 0;
         s[0] = i;
       }
