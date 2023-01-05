@@ -179,6 +179,8 @@ int main(int argc, char *argv[]) {
 
   const sycl::range NumWorkItems{totalThreads};
   const sycl::range WorkGroupSize{threadsPerBlock};
+  sycl::nd_range<1> test{NumWorkItems, WorkGroupSize};
+  printf("get_local_range %lu get_global_range %lu get_group_range %lu \n", test.get_local_range()[0],  test.get_global_range()[0],  test.get_group_range()[0]);
 
   // Command Group creation
   auto cg = [&](sycl::handler &h) {    
@@ -195,7 +197,7 @@ int main(int argc, char *argv[]) {
                       sycl::group<1> gr = item.get_group();
                       sycl::range<1> r = gr.get_local_range();
                       int src = gr.get_group_id(1);
-                      printf("hellow from item %d gr %d w range %d \n", item.get_global_linear_id(), src, r.get(1));
+                      //printf("hellow from item %d gr %d w range %d \n", item.get_global_linear_id(), src, r.get(1));
                       /*
                       // Not a frontier vertex
                       if (dist_i[src] != depth_i[0]) return;
