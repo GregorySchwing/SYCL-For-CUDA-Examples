@@ -194,7 +194,7 @@ int main(int argc, char *argv[]) {
                       int src = gr.get_group_id(1);
                       // Not a frontier vertex
                       if (dist_i[src] != depth_i[0]) return;
-
+                      /*
                       for (int col_index = rows_i[src] + item.get_local_id(); col_index < rows_i[src+1]; col_index+= r.get(1)){
                         auto col = cols_i[col_index];
                         // atomic isn't neccessary since I don't set predecessor.
@@ -202,6 +202,7 @@ int main(int argc, char *argv[]) {
                         // valid solutions.
                         if (dist_i[col] == -1) dist_i[col] = dist_i[src] + 1;
                       }
+                      */
     });
   };
   myQueue.submit(cg);
