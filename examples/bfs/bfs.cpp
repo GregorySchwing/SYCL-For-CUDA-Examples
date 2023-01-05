@@ -196,13 +196,11 @@ int main(int argc, char *argv[]) {
     h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
                       sycl::group<1> gr = item.get_group();
                       sycl::range<1> r = gr.get_local_range();
-                      //int src = gr.get_group_id(1);
                       size_t src = gr.get_group_linear_id();
                       size_t blockDim = r[0];
                       size_t threadIdx = item.get_local_id();
-
-                      printf("hellow from item %lu thread %lu gr %lu w range %lu \n", item.get_global_linear_id(), threadIdx, src, r[0]);
-                      /*
+                      //printf("hellow from item %lu thread %lu gr %lu w range %lu \n", item.get_global_linear_id(), threadIdx, src, r[0]);
+                      
                       // Not a frontier vertex
                       if (dist_i[src] != depth_i[0]) return;
                       for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
@@ -212,7 +210,7 @@ int main(int argc, char *argv[]) {
                         // valid solutions.
                         if (dist_i[col] == -1) dist_i[col] = dist_i[src] + 1;
                       }
-                      */
+                      
     });
   };
   myQueue.submit(cg);
