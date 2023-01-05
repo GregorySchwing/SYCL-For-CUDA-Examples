@@ -187,13 +187,11 @@ int main(int argc, char *argv[]) {
     auto dist_i = dist.get_access<read_write_t>(h);
 
     h.parallel_for(sycl::nd_range<1>{VertexSize, WorkGroupSize}, [=](sycl::nd_item<1> item) {
-                      //printf("hellow from item %d\n", item.get_global_linear_id());
                       sycl::group<1> gr = item.get_group();
                       sycl::range<1> r = gr.get_local_range();
-
                       int src = gr.get_group_id(1);
-                                            /*
-
+                      printf("hellow from item %d gr %d w range %d \n", item.get_global_linear_id(), src, r.get(1));
+                      /*
                       // Not a frontier vertex
                       if (dist_i[src] != depth_i[0]) return;
                       for (int col_index = rows_i[src] + item.get_local_id(); col_index < rows_i[src+1]; col_index+= r.get(1)){
