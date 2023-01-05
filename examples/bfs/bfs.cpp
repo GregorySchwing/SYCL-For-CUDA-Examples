@@ -218,7 +218,7 @@ int main(int argc, char *argv[]) {
   // Command Group creation
   auto cg2 = [&](sycl::handler &h) {    
     const auto read_write_t = sycl::access::mode::read_write;
-    auto dep = depth.get_access<read_write_t>();
+    auto dep = depth.get_access<read_write_t>(h);
     h.parallel_for(Singleton,
                    [=](sycl::id<1> i) { dep[0] = dep[0]+1; });
   };
