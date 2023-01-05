@@ -202,7 +202,6 @@ int main(int argc, char *argv[]) {
                         // valid solutions.
                         if (dist_i[col] == -1) dist_i[col] = dist_i[src] + 1;
                       }
-                      */
     });
   };
   myQueue.submit(cg);
