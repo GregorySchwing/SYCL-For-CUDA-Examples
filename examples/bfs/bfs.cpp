@@ -113,29 +113,25 @@ int main(int argc, char *argv[]) {
   CSRGraph graph = createCSRGraphFromFile(config.graphFileName);
   performChecks(graph, config);
   printf("finished checking\n");
-  constexpr const size_t startSz = 1;
+  constexpr const size_t SingletonSz = 1;
 
   const sycl::range RowSize{graph.vertexNum+1};
   const sycl::range ColSize{graph.edgeNum*2};
   const sycl::range VertexSize{graph.vertexNum};
-  const sycl::range StartSize{startSz};
+  const sycl::range Singleton{SingletonSz};
 
   // Device input vectors
   sycl::buffer<unsigned int> rows{graph.srcPtr, RowSize};
   sycl::buffer<unsigned int> cols{graph.dst, ColSize};
   sycl::buffer<int> degree{graph.degree, VertexSize};
 
-  // Device intermediate vectorstart
-  // Frontier
-  sycl::buffer<bool> frontier{VertexSize};
-
   // Device output vector
   // Dist
   sycl::buffer<int> dist{VertexSize};
   // Start
-  sycl::buffer<int> start{StartSize};
+  sycl::buffer<int> start{Singleton};
   // Depth
-  sycl::buffer<int> depth{StartSize};
+  sycl::buffer<int> depth{Singleton};
 
 
   int numBlocks = graph.vertexNum;
@@ -145,20 +141,24 @@ int main(int argc, char *argv[]) {
     const auto read_t = sycl::access::mode::read;
     const auto dwrite_t = sycl::access::mode::discard_write;
     const auto read_write_t = sycl::access::mode::read_write;
-    auto h_c = degree.get_access<read_t>();
-    auto h_d = frontier.get_access<dwrite_t>();
-    auto h_e = dist.get_access<dwrite_t>();
-    auto h_f = start.get_access<read_write_t>();
-    auto h_h = depth.get_access<dwrite_t>();
+    auto deg = degree.get_access<read_t>();
+    auto d = dist.get_access<dwrite_t>();
+    auto s = start.get_access<read_write_t>();
+    auto dep = depth.get_access<dwrite_t>();
 
     for (int i = 0; i < graph.vertexNum; i++) {
       h_d[i] = false;
-      h_e[i] = 0;
-      if(!h_f[0] && h_c[i]) h_f[0] = i;
+      d[i] = -1;
+      // Found an elibible start
+      // Set its distance to itself as 0
+      // Set the start vertex
+      if(!s[0] && d[i]){ 
+        d[i] = 0;
+        s[0] = i;
+      }
     }
-    h_d[h_f[0]] = true;
-    h_h[0] = 0;
-    std::cout << "start " << h_f[0] << " degree " << h_c[h_f[0]] << std::endl;
+    dep[0] = 0;
+    std::cout << "start " << s[0] << " degree " << deg[s[0]] << std::endl;
   }
 
   auto CUDASelector = [](sycl::device const &dev) {
@@ -171,84 +171,44 @@ int main(int argc, char *argv[]) {
   };
   sycl::queue myQueue{CUDASelector};
 
-  // Command Group creation
-  auto cg = [&](sycl::handler &h) {    
-    const auto read_t = sycl::access::mode::read;
-    const auto read_write_t = sycl::access::mode::read_write;
-    const auto dwrite_t = sycl::access::mode::discard_write;
-
-    auto rows_i = rows.get_access<read_t>(h);
-    auto cols_i = cols.get_access<read_t>(h);
-    auto degree_i = degree.get_access<read_t>(h);
-
-    auto frontier_i = frontier.get_access<read_t>(h);
-    // dist
-    auto dist_i = dist.get_access<read_write_t>(h);
-
-    h.parallel_for(VertexSize,
-                   [=](sycl::id<1> i) { dist_i[i] = degree_i[i]; });
-  };
-
-  myQueue.submit(cg);
-
-  {
-    const auto read_t = sycl::access::mode::read;
-    auto h_e = dist.get_access<read_t>();
-    double sum = 0.0f;
-    for (int i = 0; i < graph.vertexNum; i++) {
-      sum += h_e[i];
-    }
-    std::cout << "Sum is : " << sum << std::endl;
-  }
-
-  // Initialize input data
-  {
-    const auto dwrite_t = sycl::access::mode::discard_write;
-    auto h_e = dist.get_access<dwrite_t>();
-
-    for (int i = 0; i < graph.vertexNum; i++) {
-      h_e[i] = 0;
-    }
-  }
-
   int work_group_size = 2;
-  int data_size = graph.vertexNum;
-  int num_work_items = data_size / work_group_size;
+  int num_work_groups = graph.vertexNum;
 
   // Command Group creation
   auto cg2 = [&](sycl::handler &h) {    
     const auto read_t = sycl::access::mode::read;
     const auto read_write_t = sycl::access::mode::read_write;
-    const auto dwrite_t = sycl::access::mode::discard_write;
 
     auto rows_i = rows.get_access<read_t>(h);
     auto cols_i = cols.get_access<read_t>(h);
-    auto degree_i = degree.get_access<read_t>(h);
-
-    auto frontier_i = frontier.get_access<read_t>(h);
-    // dist
     auto dist_i = dist.get_access<read_write_t>(h);
+    auto depth = depth.get_access<read>(h);
 
-    h.parallel_for_work_group(sycl::range<1>(num_work_items), sycl::range<1>(work_group_size),
-                   [=](sycl::nd_item<1> item) { 
-                      int glob_id = item.get_global_id();
-                      int loc_id = item.get_local_id();
-                      for (unsigned int i = loc_id; i < work_group_size; i += 1)
-                        dist_i[glob_id+i] += degree_i[glob_id+i]; 
-                    });
+    h.parallel_for(sycl::nd_range<1>{num_work_groups, work_group_size}, [=](sycl::nd_item<1> item) {
+                      int gr = item.get_group();
+                      int src = gr.get_linear_id();
+                      // Not a frontier vertex
+                      if (dist_i[src] != depth) return;
+                      for (int col_index = rows[src] + item.get_local_id(); col_index < rows[src+1]; col_index+= gr.get_local_range()){
+                        // atomic isn't neccessary since I don't set predecessor.
+                        // even if I set predecessor, all races remain in the universe of
+                        // valid solutions.
+                        if (dist_i[col_index] == -1) dist_i[col_index] = dist_i[src] + 1;
+                      }
+    });
   };
 
   myQueue.submit(cg2);
 
   {
     const auto read_t = sycl::access::mode::read;
-    auto h_e = dist.get_access<read_t>();
-    double sum = 0.0f;
+    auto s = start.get_access<read_t>();
+    auto d = dist.get_access<read_t>();
+    std::cout << "Distance from start " << s << " is : " << std::endl;
     for (int i = 0; i < graph.vertexNum; i++) {
-      //printf("%d ",h_e[i] );
-      sum += h_e[i];
+      printf("%d ",d[i] );
     }
-    std::cout << "Sum2 is : " << sum << std::endl;
+    std::cout << std::endl;
   }
 
   return 0;
