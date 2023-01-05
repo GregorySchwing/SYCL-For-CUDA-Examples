@@ -174,8 +174,8 @@ int main(int argc, char *argv[]) {
 
   const int numBlocks = graph.vertexNum;
 
-  const int threadsPerBlock = 32;
-  const int totalThreads = numBlocks * threadsPerBlock;
+  const size_t threadsPerBlock = 32;
+  const size_t totalThreads = numBlocks * threadsPerBlock;
 
   const sycl::range NumWorkItems{totalThreads};
   const sycl::range WorkGroupSize{threadsPerBlock};
