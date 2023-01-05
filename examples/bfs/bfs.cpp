@@ -134,7 +134,8 @@ int main(int argc, char *argv[]) {
   sycl::buffer<int> start{Singleton};
   // Depth
   sycl::buffer<int> depth{Singleton};
-
+  // Expanded
+  sycl::buffer<bool> expanded{Singleton};
 
 
   // Initialize input data
@@ -146,6 +147,7 @@ int main(int argc, char *argv[]) {
     auto d = dist.get_access<dwrite_t>();
     auto s = start.get_access<read_write_t>();
     auto dep = depth.get_access<dwrite_t>();
+    auto exp = expanded.get_access<dwrite_t>();
 
     for (int i = 0; i < graph.vertexNum; i++) {
       d[i] = -1;
@@ -158,6 +160,7 @@ int main(int argc, char *argv[]) {
       }
     }
     dep[0] = 0;
+    exp[0] = 0;
     std::cout << "start " << s[0] << " degree " << deg[s[0]] << std::endl;
   }
 
@@ -185,12 +188,13 @@ int main(int argc, char *argv[]) {
   // Command Group creation
   auto cg = [&](sycl::handler &h) {    
     const auto read_t = sycl::access::mode::read;
+    const auto write_t = sycl::access::mode::write;
     const auto read_write_t = sycl::access::mode::read_write;
 
     auto rows_i = rows.get_access<read_t>(h);
     auto cols_i = cols.get_access<read_t>(h);
     auto depth_i = depth.get_access<read_t>(h);
-
+    auto expanded_i = expanded.get_access<write_t>(h);
     auto dist_i = dist.get_access<read_write_t>(h);
 
     h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
@@ -209,7 +213,10 @@ int main(int argc, char *argv[]) {
                         // atomic isn't neccessary since I don't set predecessor.
                         // even if I set predecessor, all races remain in the universe of
                         // valid solutions.
-                        if (dist_i[col] == -1) dist_i[col] = dist_i[src] + 1;
+                        if (dist_i[col] == -1){
+                           dist_i[col] = dist_i[src] + 1;
+                           expanded_i[0] = 1;
+                        }
                       }                     
     });
   };
