@@ -198,7 +198,7 @@ int main(int argc, char *argv[]) {
                       sycl::range<1> r = gr.get_local_range();
                       //int src = gr.get_group_id(1);
                       size_t src = gr.get_linear_id();
-                      printf("hellow from item %d gr %zu w range %d \n", item.get_global_linear_id(), src, r[0]);
+                      printf("hellow from item %zu gr %zu w range %zu \n", item.get_global_linear_id(), src, r[0]);
                       /*
                       // Not a frontier vertex
                       if (dist_i[src] != depth_i[0]) return;
