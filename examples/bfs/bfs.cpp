@@ -220,7 +220,7 @@ int main(int argc, char *argv[]) {
     const auto read_write_t = sycl::access::mode::read_write;
     auto dep = depth.get_access<read_write_t>();
     h.parallel_for(Singleton,
-                   [=](sycl::id<1> i) { depth[0] = depth[0]+1; });
+                   [=](sycl::id<1> i) { dep[0] = dep[0]+1; });
   };
   myQueue.submit(cg2);
 
@@ -231,7 +231,7 @@ int main(int argc, char *argv[]) {
     auto dep = depth.get_access<read_t>();
 
     std::cout << "Distance from start " << s[0] << " is : " << std::endl;
-    for (int depth_to_print = 0; depth_to_print < dep[0]; depth_to_print++) {
+    for (int depth_to_print = 0; depth_to_print <= dep[0]; depth_to_print++) {
       for (int i = 0; i < graph.vertexNum; i++) {
         if (d[i] == depth_to_print) printf("vertex %d dist %d\n",i, d[i]);
       }
