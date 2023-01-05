@@ -147,7 +147,6 @@ int main(int argc, char *argv[]) {
     auto dep = depth.get_access<dwrite_t>();
 
     for (int i = 0; i < graph.vertexNum; i++) {
-      h_d[i] = false;
       d[i] = -1;
       // Found an elibible start
       // Set its distance to itself as 0
