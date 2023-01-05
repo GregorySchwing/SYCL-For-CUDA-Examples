@@ -185,6 +185,15 @@ int main(int argc, char *argv[]) {
   sycl::nd_range<1> test{NumWorkItems, WorkGroupSize};
   printf("get_local_range %lu get_global_range %lu get_group_range %lu \n", test.get_local_range()[0],  test.get_global_range()[0],  test.get_group_range()[0]);
 
+  bool flag = false;
+  do{
+
+  {
+    const auto write_t = sycl::access::mode::write;
+    auto exp = expanded.get_access<read_t>();
+    exp[0] = false;
+  }
+
   // Command Group creation
   auto cg = [&](sycl::handler &h) {    
     const auto read_t = sycl::access::mode::read;
@@ -230,6 +239,14 @@ int main(int argc, char *argv[]) {
                    [=](sycl::id<1> i) { dep[0] = dep[0]+1; });
   };
   myQueue.submit(cg2);
+
+  {
+    const auto read_t = sycl::access::mode::read;
+    auto exp = expanded.get_access<read_t>();
+    flag = exp[0];
+  }
+
+  } while(flag);
 
   {
     const auto read_t = sycl::access::mode::read;
