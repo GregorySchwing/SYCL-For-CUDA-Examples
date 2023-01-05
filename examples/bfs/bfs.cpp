@@ -181,7 +181,7 @@ int main(int argc, char *argv[]) {
     auto rows_i = rows.get_access<read_t>(h);
     auto cols_i = cols.get_access<read_t>(h);
     auto dist_i = dist.get_access<read_write_t>(h);
-    auto depth_i = depth.get_access<read>(h);
+    auto depth_i = depth.get_access<read_t>();
 
     h.parallel_for(sycl::nd_range<1>{num_work_groups, work_group_size}, [=](sycl::nd_item<1> item) {
                       sycl::group<1> gr = item.get_group();
