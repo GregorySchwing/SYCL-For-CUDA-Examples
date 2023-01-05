@@ -188,64 +188,63 @@ int main(int argc, char *argv[]) {
   bool flag = false;
   do{
 
-  {
-    const auto write_t = sycl::access::mode::write;
-    auto exp = expanded.get_access<write_t>();
-    exp[0] = false;
-  }
+    {
+      const auto write_t = sycl::access::mode::write;
+      auto exp = expanded.get_access<write_t>();
+      exp[0] = false;
+    }
 
-  // Command Group creation
-  auto cg = [&](sycl::handler &h) {    
-    const auto read_t = sycl::access::mode::read;
-    const auto write_t = sycl::access::mode::write;
-    const auto read_write_t = sycl::access::mode::read_write;
+    // Command Group creation
+    auto cg = [&](sycl::handler &h) {    
+      const auto read_t = sycl::access::mode::read;
+      const auto write_t = sycl::access::mode::write;
+      const auto read_write_t = sycl::access::mode::read_write;
 
-    auto rows_i = rows.get_access<read_t>(h);
-    auto cols_i = cols.get_access<read_t>(h);
-    auto depth_i = depth.get_access<read_t>(h);
-    auto expanded_i = expanded.get_access<write_t>(h);
-    auto dist_i = dist.get_access<read_write_t>(h);
+      auto rows_i = rows.get_access<read_t>(h);
+      auto cols_i = cols.get_access<read_t>(h);
+      auto depth_i = depth.get_access<read_t>(h);
+      auto expanded_i = expanded.get_access<write_t>(h);
+      auto dist_i = dist.get_access<read_write_t>(h);
 
-    h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
-                      sycl::group<1> gr = item.get_group();
-                      sycl::range<1> r = gr.get_local_range();
-                      size_t src = gr.get_group_linear_id();
-                      size_t blockDim = r[0];
-                      size_t threadIdx = item.get_local_id();
-                      //printf("hellow from item %lu thread %lu gr %lu w range %lu \n", item.get_global_linear_id(), threadIdx, src, r[0]);
-                      
-                      // Not a frontier vertex
-                      if (dist_i[src] != depth_i[0]) return;
-                      
-                      for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
-                        auto col = cols_i[col_index];
-                        // atomic isn't neccessary since I don't set predecessor.
-                        // even if I set predecessor, all races remain in the universe of
-                        // valid solutions.
-                        if (dist_i[col] == -1){
-                           dist_i[col] = dist_i[src] + 1;
-                           expanded_i[0] = 1;
-                        }
-                      }                     
-    });
-  };
-  myQueue.submit(cg);
+      h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
+                        sycl::group<1> gr = item.get_group();
+                        sycl::range<1> r = gr.get_local_range();
+                        size_t src = gr.get_group_linear_id();
+                        size_t blockDim = r[0];
+                        size_t threadIdx = item.get_local_id();
+                        //printf("hellow from item %lu thread %lu gr %lu w range %lu \n", item.get_global_linear_id(), threadIdx, src, r[0]);
+                        
+                        // Not a frontier vertex
+                        if (dist_i[src] != depth_i[0]) return;
+                        
+                        for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
+                          auto col = cols_i[col_index];
+                          // atomic isn't neccessary since I don't set predecessor.
+                          // even if I set predecessor, all races remain in the universe of
+                          // valid solutions.
+                          if (dist_i[col] == -1){
+                            dist_i[col] = dist_i[src] + 1;
+                            expanded_i[0] = 1;
+                          }
+                        }                     
+      });
+    };
+    myQueue.submit(cg);
 
-  // Command Group creation
-  auto cg2 = [&](sycl::handler &h) {    
-    const auto read_write_t = sycl::access::mode::read_write;
-    auto dep = depth.get_access<read_write_t>(h);
-    h.parallel_for(Singleton,
-                   [=](sycl::id<1> i) { dep[0] = dep[0]+1; });
-  };
-  myQueue.submit(cg2);
+    // Command Group creation
+    auto cg2 = [&](sycl::handler &h) {    
+      const auto read_write_t = sycl::access::mode::read_write;
+      auto dep = depth.get_access<read_write_t>(h);
+      h.parallel_for(Singleton,
+                    [=](sycl::id<1> i) { dep[0] = dep[0]+1; });
+    };
+    myQueue.submit(cg2);
 
-  {
-    const auto read_t = sycl::access::mode::read;
-    auto exp = expanded.get_access<read_t>();
-    flag = exp[0];
-  }
-
+    {
+      const auto read_t = sycl::access::mode::read;
+      auto exp = expanded.get_access<read_t>();
+      flag = exp[0];
+    }
   } while(flag);
 
   {
