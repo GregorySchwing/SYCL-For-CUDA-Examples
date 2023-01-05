@@ -187,7 +187,7 @@ int main(int argc, char *argv[]) {
     auto dist_i = dist.get_access<read_write_t>(h);
 
     h.parallel_for(sycl::nd_range<1>{VertexSize, WorkGroupSize}, [=](sycl::nd_item<1> item) {
-                      printf("hellow from item %d\n", item.get_id());
+                      printf("hellow from item %d\n", item.get_global_linear_id());
                       /*
                       sycl::group<1> gr = item.get_group();
                       sycl::range<1> r = gr.get_local_range();
