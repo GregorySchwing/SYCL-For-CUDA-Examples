@@ -173,9 +173,11 @@ int main(int argc, char *argv[]) {
 
 
   const int numBlocks = graph.vertexNum;
-  const int threadsPerBlock = 32;
 
-  const sycl::range NumWorkItems{numBlocks * threadsPerBlock};
+  const int threadsPerBlock = 32;
+  const int totalThreads = numBlocks * threadsPerBlock;
+
+  const sycl::range NumWorkItems{totalThreads};
   const sycl::range WorkGroupSize{threadsPerBlock};
 
   // Command Group creation
