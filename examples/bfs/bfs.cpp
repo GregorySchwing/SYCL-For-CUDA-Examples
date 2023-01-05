@@ -118,6 +118,8 @@ int main(int argc, char *argv[]) {
   const sycl::range RowSize{graph.vertexNum+1};
   const sycl::range ColSize{graph.edgeNum*2};
   const sycl::range VertexSize{graph.vertexNum};
+  const sycl::range WorkGroupSize{2};
+
   const sycl::range Singleton{SingletonSz};
 
   // Device input vectors
@@ -184,7 +186,7 @@ int main(int argc, char *argv[]) {
 
     auto dist_i = dist.get_access<read_write_t>(h);
 
-    h.parallel_for(sycl::nd_range<1>{num_work_groups, work_group_size}, [=](sycl::nd_item<1> item) {
+    h.parallel_for(sycl::nd_range<1>{VertexSize, WorkGroupSize}, [=](sycl::nd_item<1> item) {
                       printf("hellow from item %d\n", item.get_id());
                       /*
                       sycl::group<1> gr = item.get_group();
