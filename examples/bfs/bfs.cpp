@@ -220,8 +220,10 @@ int main(int argc, char *argv[]) {
     auto s = start.get_access<read_t>();
     auto d = dist.get_access<read_t>();
     std::cout << "Distance from start " << s[0] << " is : " << std::endl;
-    for (int i = 0; i < graph.vertexNum; i++) {
-      if (d[i] > -1) printf("vertex %d dist %d\n",i, d[i]);
+    for (int depth_to_print = 0; depth_to_print < d; depth_to_print++) {
+      for (int i = 0; i < graph.vertexNum; i++) {
+        if (d[i] == depth_to_print) printf("vertex %d dist %d\n",i, d[i]);
+      }
     }
     std::cout << std::endl;
   }
