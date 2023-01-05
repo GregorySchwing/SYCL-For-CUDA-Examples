@@ -215,6 +215,15 @@ int main(int argc, char *argv[]) {
   };
   myQueue.submit(cg);
 
+  // Command Group creation
+  auto cg2 = [&](sycl::handler &h) {    
+    const auto read_write_t = sycl::access::mode::read_write;
+    auto dep = depth.get_access<read_write_t>();
+    h.parallel_for(Singleton,
+                   [=](sycl::id<1> i) { depth[0] = depth[0]+1; });
+  };
+  myQueue.submit(cg2);
+
   {
     const auto read_t = sycl::access::mode::read;
     auto s = start.get_access<read_t>();
