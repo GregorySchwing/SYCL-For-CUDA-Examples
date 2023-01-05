@@ -202,7 +202,7 @@ int main(int argc, char *argv[]) {
                       //printf("hellow from item %lu thread %lu gr %lu w range %lu \n", item.get_global_linear_id(), threadIdx, src, r[0]);
                       
                       // Not a frontier vertex
-                      if (dist_i[src] != depth_i[0]) return;
+                      if (dist_i[src] != depth_i[0]) ;
                       /*
                       for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
                         auto col = cols_i[col_index];
