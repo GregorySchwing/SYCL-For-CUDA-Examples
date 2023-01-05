@@ -219,8 +219,10 @@ int main(int argc, char *argv[]) {
     const auto read_t = sycl::access::mode::read;
     auto s = start.get_access<read_t>();
     auto d = dist.get_access<read_t>();
+    auto dep = depth.get_access<read_t>();
+
     std::cout << "Distance from start " << s[0] << " is : " << std::endl;
-    for (int depth_to_print = 0; depth_to_print < d; depth_to_print++) {
+    for (int depth_to_print = 0; depth_to_print < dep[0]; depth_to_print++) {
       for (int i = 0; i < graph.vertexNum; i++) {
         if (d[i] == depth_to_print) printf("vertex %d dist %d\n",i, d[i]);
       }
