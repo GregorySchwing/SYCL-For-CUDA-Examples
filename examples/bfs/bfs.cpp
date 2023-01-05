@@ -203,16 +203,14 @@ int main(int argc, char *argv[]) {
                       
                       // Not a frontier vertex
                       if (dist_i[src] != depth_i[0]) return;
-                      /*
+                      
                       for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
                         auto col = cols_i[col_index];
                         // atomic isn't neccessary since I don't set predecessor.
                         // even if I set predecessor, all races remain in the universe of
                         // valid solutions.
                         if (dist_i[col] == -1) dist_i[col] = dist_i[src] + 1;
-                      }
-                      */
-                      
+                      }                     
     });
   };
   myQueue.submit(cg);
