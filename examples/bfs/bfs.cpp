@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
   const sycl::range RowSize{graph.vertexNum+1};
   const sycl::range ColSize{graph.edgeNum*2};
   const sycl::range VertexSize{graph.vertexNum};
-  const sycl::range WorkGroupSize{2};
+  
 
   const sycl::range Singleton{SingletonSz};
 
@@ -136,8 +136,7 @@ int main(int argc, char *argv[]) {
   sycl::buffer<int> depth{Singleton};
 
 
-  int numBlocks = graph.vertexNum;
-  int threadsPerBlock = 32;
+
   // Initialize input data
   {
     const auto read_t = sycl::access::mode::read;
@@ -172,8 +171,12 @@ int main(int argc, char *argv[]) {
   };
   sycl::queue myQueue{CUDASelector};
 
-  int work_group_size = 2;
-  int num_work_groups = graph.vertexNum;
+
+  int numBlocks = graph.vertexNum;
+  int threadsPerBlock = 32;
+
+  const sycl::range NumWorkItems{numBlocks * threadsPerBlock};
+  const sycl::range WorkGroupSize{threadsPerBlock};
 
   // Command Group creation
   auto cg = [&](sycl::handler &h) {    
@@ -186,7 +189,7 @@ int main(int argc, char *argv[]) {
 
     auto dist_i = dist.get_access<read_write_t>(h);
 
-    h.parallel_for(sycl::nd_range<1>{VertexSize, WorkGroupSize}, [=](sycl::nd_item<1> item) {
+    h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
                       sycl::group<1> gr = item.get_group();
                       sycl::range<1> r = gr.get_local_range();
                       int src = gr.get_group_id(1);
