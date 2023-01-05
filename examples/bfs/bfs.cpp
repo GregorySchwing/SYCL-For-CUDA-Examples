@@ -196,8 +196,9 @@ int main(int argc, char *argv[]) {
     h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
                       sycl::group<1> gr = item.get_group();
                       sycl::range<1> r = gr.get_local_range();
-                      int src = gr.get_group_id(1);
-                      //printf("hellow from item %d gr %d w range %d \n", item.get_global_linear_id(), src, r.get(1));
+                      //int src = gr.get_group_id(1);
+                      size_t src = gr.get_linear_id();
+                      printf("hellow from item %d gr %d w range %d \n", item.get_global_linear_id(), src, r[0]);
                       /*
                       // Not a frontier vertex
                       if (dist_i[src] != depth_i[0]) return;
