@@ -205,7 +205,7 @@ int main(int argc, char *argv[]) {
     auto d = dist.get_access<read_t>();
     std::cout << "Distance from start " << s[0] << " is : " << std::endl;
     for (int i = 0; i < graph.vertexNum; i++) {
-      if (d[i] > -1) printf("%d ",d[i] );
+      if (d[i] > -1) printf("%d %d",i, d[i]);
     }
     std::cout << std::endl;
   }
