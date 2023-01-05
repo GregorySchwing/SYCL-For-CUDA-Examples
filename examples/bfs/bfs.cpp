@@ -184,7 +184,7 @@ int main(int argc, char *argv[]) {
     auto depth_i = depth.get_access<read>(h);
 
     h.parallel_for(sycl::nd_range<1>{num_work_groups, work_group_size}, [=](sycl::nd_item<1> item) {
-                      int gr = item.get_group();
+                      sycl::group<1> gr = item.get_group();
                       int src = gr.get_linear_id();
                       // Not a frontier vertex
                       if (dist_i[src] != depth_i[0]) return;
