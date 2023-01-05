@@ -173,7 +173,6 @@ int main(int argc, char *argv[]) {
   int work_group_size = 2;
   int num_work_groups = graph.vertexNum;
 
-  /*
   // Command Group creation
   auto cg = [&](sycl::handler &h) {    
     const auto read_t = sycl::access::mode::read;
@@ -182,13 +181,13 @@ int main(int argc, char *argv[]) {
     auto rows_i = rows.get_access<read_t>(h);
     auto cols_i = cols.get_access<read_t>(h);
     auto dist_i = dist.get_access<read_write_t>(h);
-    auto depth = depth.get_access<read>(h);
+    auto depth_i = depth.get_access<read>(h);
 
     h.parallel_for(sycl::nd_range<1>{num_work_groups, work_group_size}, [=](sycl::nd_item<1> item) {
                       int gr = item.get_group();
                       int src = gr.get_linear_id();
                       // Not a frontier vertex
-                      if (dist_i[src] != depth) return;
+                      if (dist_i[src] != depth_i[0]) return;
                       for (int col_index = rows[src] + item.get_local_id(); col_index < rows[src+1]; col_index+= gr.get_local_range()){
                         // atomic isn't neccessary since I don't set predecessor.
                         // even if I set predecessor, all races remain in the universe of
@@ -198,14 +197,14 @@ int main(int argc, char *argv[]) {
     });
   };
   myQueue.submit(cg);
-  */
+
   {
     const auto read_t = sycl::access::mode::read;
     auto s = start.get_access<read_t>();
     auto d = dist.get_access<read_t>();
     std::cout << "Distance from start " << s[0] << " is : " << std::endl;
     for (int i = 0; i < graph.vertexNum; i++) {
-      if (d[i] > -1) printf("%d %d",i, d[i]);
+      if (d[i] > -1) printf("vertex %d dist %d",i, d[i]);
     }
     std::cout << std::endl;
   }
