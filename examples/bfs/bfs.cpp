@@ -185,10 +185,12 @@ int main(int argc, char *argv[]) {
 
     h.parallel_for(sycl::nd_range<1>{num_work_groups, work_group_size}, [=](sycl::nd_item<1> item) {
                       sycl::group<1> gr = item.get_group();
+                      sycl::range<1> r = gr.get_local_range();
+
                       int src = gr.get_linear_id();
                       // Not a frontier vertex
                       if (dist_i[src] != depth_i[0]) return;
-                      for (int col_index = rows_i[src] + item.get_local_id(); col_index < rows_i[src+1]; col_index+= gr.get_local_range()){
+                      for (int col_index = rows_i[src] + item.get_local_id(); col_index < rows_i[src+1]; col_index+= r.get(1)){
                         auto col = cols_i[col_index];
                         // atomic isn't neccessary since I don't set predecessor.
                         // even if I set predecessor, all races remain in the universe of
