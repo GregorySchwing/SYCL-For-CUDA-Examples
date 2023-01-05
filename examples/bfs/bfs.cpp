@@ -172,8 +172,8 @@ int main(int argc, char *argv[]) {
   sycl::queue myQueue{CUDASelector};
 
 
-  int numBlocks = graph.vertexNum;
-  int threadsPerBlock = 32;
+  const int numBlocks = graph.vertexNum;
+  const int threadsPerBlock = 32;
 
   const sycl::range NumWorkItems{numBlocks * threadsPerBlock};
   const sycl::range WorkGroupSize{threadsPerBlock};
