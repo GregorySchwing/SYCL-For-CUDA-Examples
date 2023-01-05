@@ -174,8 +174,9 @@ int main(int argc, char *argv[]) {
   int work_group_size = 2;
   int num_work_groups = graph.vertexNum;
 
+  /*
   // Command Group creation
-  auto cg2 = [&](sycl::handler &h) {    
+  auto cg = [&](sycl::handler &h) {    
     const auto read_t = sycl::access::mode::read;
     const auto read_write_t = sycl::access::mode::read_write;
 
@@ -197,14 +198,13 @@ int main(int argc, char *argv[]) {
                       }
     });
   };
-
-  myQueue.submit(cg2);
-
+  myQueue.submit(cg);
+  */
   {
     const auto read_t = sycl::access::mode::read;
     auto s = start.get_access<read_t>();
     auto d = dist.get_access<read_t>();
-    std::cout << "Distance from start " << s << " is : " << std::endl;
+    std::cout << "Distance from start " << s[0] << " is : " << std::endl;
     for (int i = 0; i < graph.vertexNum; i++) {
       printf("%d ",d[i] );
     }
