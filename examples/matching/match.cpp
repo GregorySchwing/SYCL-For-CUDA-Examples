@@ -348,7 +348,7 @@ int main(int argc, char *argv[]) {
     // just to keep from entering an inf loop till all matching logic is done.
     flag = false;
   } while(flag);
-
+  /*
   {
     const auto read_t = sycl::access::mode::read;
     const auto read_write_t = sycl::access::mode::read_write;
@@ -364,5 +364,6 @@ int main(int argc, char *argv[]) {
     std::cout << "blue count : " << cs[1] << std::endl;
     std::cout << "matched count : " << graph.vertexNum-(cs[0]+cs[1]) << std::endl;
   }
+  */
   return 0;
 }
