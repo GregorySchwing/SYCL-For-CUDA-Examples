@@ -161,6 +161,8 @@ int main(int argc, char *argv[]) {
 
       //Can this vertex still be matched?
       if (match_i[i] >= 2) return;
+
+      // TODO: template the hash functions in hashing/ for testing here.
       //Start hashing.
       uint h0 = 0x67452301, h1 = 0xefcdab89, h2 = 0x98badcfe, h3 = 0x10325476;
       uint a = h0, b = h1, c = h2, d = h3, e, f, g = i;
@@ -238,22 +240,18 @@ int main(int argc, char *argv[]) {
       flag = exp[0];
     }
     */
+      {
+      const auto read_t = sycl::access::mode::read;
+      auto km = keepMatching.get_access<read_t>();
+      flag = km[0];
+    }
   } while(flag);
-  /*
   {
     const auto read_t = sycl::access::mode::read;
-    auto s = start.get_access<read_t>();
-    auto d = dist.get_access<read_t>();
-    auto dep = depth.get_access<read_t>();
-
-    std::cout << "Distance from start " << s[0] << " is : " << std::endl;
-    for (int depth_to_print = 0; depth_to_print <= dep[0]; depth_to_print++) {
-      for (int i = 0; i < graph.vertexNum; i++) {
-        if (d[i] == depth_to_print) printf("vertex %d dist %d\n",i, d[i]);
-      }
+    auto m = match.get_access<read_t>();
+    for (int i = 0; i < graph.vertexNum; i++) {
+      printf("%d %d\n",i,m[i]);
     }
-    std::cout << std::endl;
   }
-  */
   return 0;
 }
