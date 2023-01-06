@@ -46,8 +46,8 @@ const uint dMD5R[64] = {7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 
 #define LEFTROTATE(a, b) (((a) << (b)) | ((a) >> (32 - (b))))
 
 const unsigned int hashArraySize = 64;
-const unsigned int selectBarrier_default = 0x8000000;
-
+//const unsigned int selectBarrier_default = 0x8000000;
+const	unsigned int selectBarrier_default = 0x88B81733;
 int main(int argc, char *argv[]) {
 
   Config config = parseArgs(argc,argv);
@@ -59,6 +59,7 @@ int main(int argc, char *argv[]) {
   performChecks(graph, config);
   printf("finished checking\n");
   constexpr const size_t SingletonSz = 1;
+  constexpr const size_t DoubletonSz = 2;
 
   const sycl::range RowSize{graph.vertexNum+1};
   const sycl::range ColSize{graph.edgeNum*2};
@@ -68,6 +69,7 @@ int main(int argc, char *argv[]) {
   
 
   const sycl::range Singleton{SingletonSz};
+  const sycl::range Doubleton{DoubletonSz};
 
   // Device input vectors
   sycl::buffer<unsigned int> rows{graph.srcPtr, RowSize};
@@ -86,6 +88,7 @@ int main(int argc, char *argv[]) {
   sycl::buffer<unsigned int> selectBarrier {Singleton};
   sycl::buffer<unsigned int> random {Singleton};
   sycl::buffer<bool> keepMatching{Singleton};
+  sycl::buffer<unsigned int> colsum {Doubleton};
 
 
   // Initialize input data
@@ -99,6 +102,7 @@ int main(int argc, char *argv[]) {
     auto sb = selectBarrier.get_access<dwrite_t>();
     auto km = keepMatching.get_access<dwrite_t>();
     auto rand = random.get_access<dwrite_t>();
+    auto cs = colsum.get_access<dwrite_t>();
 
     for (int i = 0; i < graph.vertexNum; i++) {
       m[i] = 0;
@@ -107,6 +111,9 @@ int main(int argc, char *argv[]) {
     rand[0] = selectBarrier_default;
     sb[0] = selectBarrier_default;
     km[0] = true;
+    cs[0] = 0;
+    cs[1] = 0;
+
     std::cout << "selectBarrier " << sb[0] << std::endl;
   }
 
@@ -132,115 +139,63 @@ int main(int argc, char *argv[]) {
 
   bool flag = false;
   do{
-
     {
       const auto write_t = sycl::access::mode::write;
       auto km = keepMatching.get_access<write_t>();
       km[0] = false;
     }
 
-  // Color vertices
-  // Command Group creation
-  auto cg = [&](sycl::handler &h) {    
-    const auto read_t = sycl::access::mode::read;
-    const auto read_write_t = sycl::access::mode::read_write;
-
-    // dist
-    auto sb = selectBarrier.get_access<read_t>(h);
-    auto random_a = random.get_access<read_t>(h);
-
-    auto aMD5K = MD5K.get_access<read_t>(h);
-    auto aMD5R = MD5R.get_access<read_t>(h);
-
-    auto match_i = match.get_access<read_write_t>(h);
-
-    h.parallel_for(VertexSize,
-                   [=](sycl::id<1> i) { 
-      // Unnecessary
-      // if (i >= nrVertices) return;
-
-      //Can this vertex still be matched?
-      if (match_i[i] >= 2) return;
-
-      // TODO: template the hash functions in hashing/ for testing here.
-      //Start hashing.
-      uint h0 = 0x67452301, h1 = 0xefcdab89, h2 = 0x98badcfe, h3 = 0x10325476;
-      uint a = h0, b = h1, c = h2, d = h3, e, f, g = i;
-
-      for (int j = 0; j < 16; ++j)
-      {
-        f = (b & c) | ((~b) & d);
-
-        e = d;
-        d = c;
-        c = b;
-        b += LEFTROTATE(a + f + aMD5K[j] + g, aMD5R[j]);
-        a = e;
-
-        h0 += a;
-        h1 += b;
-        h2 += c;
-        h3 += d;
-
-        g *= random_a[0];
-      }
-      match_i[i] = ((h0 + h1 + h2 + h3) < sb[0] ? 0 : 1);
-    });
-  };
-
-
-/*
+    // Color vertices
     // Command Group creation
     auto cg = [&](sycl::handler &h) {    
       const auto read_t = sycl::access::mode::read;
-      const auto write_t = sycl::access::mode::write;
       const auto read_write_t = sycl::access::mode::read_write;
 
-      auto rows_i = rows.get_access<read_t>(h);
-      auto cols_i = cols.get_access<read_t>(h);
+      // dist
+      auto sb = selectBarrier.get_access<read_t>(h);
+      auto random_a = random.get_access<read_t>(h);
+
+      auto aMD5K = MD5K.get_access<read_t>(h);
+      auto aMD5R = MD5R.get_access<read_t>(h);
+
       auto match_i = match.get_access<read_write_t>(h);
 
-      h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
-                        sycl::group<1> gr = item.get_group();
-                        sycl::range<1> r = gr.get_local_range();
-                        size_t src = gr.get_group_linear_id();
-                        size_t blockDim = r[0];
-                        size_t threadIdx = item.get_local_id();
-                        //printf("hellow from item %lu thread %lu gr %lu w range %lu \n", item.get_global_linear_id(), threadIdx, src, r[0]);
-                        
-                        // Not a frontier vertex
-                        if (dist_i[src] != depth_i[0]) return;
-                        
-                        for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
-                          auto col = cols_i[col_index];
-                          // atomic isn't neccessary since I don't set predecessor.
-                          // even if I set predecessor, all races remain in the universe of
-                          // valid solutions.
-                          if (dist_i[col] == -1){
-                            dist_i[col] = dist_i[src] + 1;
-                            expanded_i[0] = 1;
-                          }
-                        }                     
+      h.parallel_for(VertexSize,
+                    [=](sycl::id<1> i) { 
+        // Unnecessary
+        // if (i >= nrVertices) return;
+
+        //Can this vertex still be matched?
+        if (match_i[i] >= 2) return;
+
+        // TODO: template the hash functions in hashing/ for testing here.
+        //Start hashing.
+        uint h0 = 0x67452301, h1 = 0xefcdab89, h2 = 0x98badcfe, h3 = 0x10325476;
+        uint a = h0, b = h1, c = h2, d = h3, e, f, g = i;
+
+        for (int j = 0; j < 16; ++j)
+        {
+          f = (b & c) | ((~b) & d);
+
+          e = d;
+          d = c;
+          c = b;
+          b += LEFTROTATE(a + f + aMD5K[j] + g, aMD5R[j]);
+          a = e;
+
+          h0 += a;
+          h1 += b;
+          h2 += c;
+          h3 += d;
+
+          g *= random_a[0];
+        }
+        match_i[i] = ((h0 + h1 + h2 + h3) < sb[0] ? 0 : 1);
       });
     };
     myQueue.submit(cg);
 
-    // Command Group creation
-    auto cg2 = [&](sycl::handler &h) {    
-      const auto read_write_t = sycl::access::mode::read_write;
-      auto dep = depth.get_access<read_write_t>(h);
-      h.parallel_for(Singleton,
-                    [=](sycl::id<1> i) { dep[0] = dep[0]+1; });
-    };
-    myQueue.submit(cg2);
-
     {
-      const auto read_t = sycl::access::mode::read;
-      auto exp = expanded.get_access<read_t>();
-      flag = exp[0];
-    }
-    */
-      {
       const auto read_t = sycl::access::mode::read;
       auto km = keepMatching.get_access<read_t>();
       flag = km[0];
@@ -248,10 +203,17 @@ int main(int argc, char *argv[]) {
   } while(flag);
   {
     const auto read_t = sycl::access::mode::read;
+    const auto read_write_t = sycl::access::mode::read_write;
+
     auto m = match.get_access<read_t>();
+    auto cs = colsum.get_access<read_write_t>();
+
     for (int i = 0; i < graph.vertexNum; i++) {
-      printf("%d %d\n",i,m[i]);
+      ++cs[m[i]];
+      //printf("%d %d\n",i,m[i]);
     }
+    std::cout << "red count : " << cs[0] << std::endl;
+    std::cout << "blue count : " << cs[1] << std::endl;
   }
   return 0;
 }
