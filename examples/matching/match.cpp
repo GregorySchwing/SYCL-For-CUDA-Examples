@@ -365,5 +365,15 @@ int main(int argc, char *argv[]) {
     std::cout << "matched count : " << graph.vertexNum-(cs[0]+cs[1]) << std::endl;
   }
   */
+{
+    const auto read_t = sycl::access::mode::read;
+
+    auto m = match.get_access<read_t>();
+
+    for (int i = 0; i < graph.vertexNum; i++) {
+      printf("%d %d\n", i, m[i]);
+    }
+  }
+
   return 0;
 }
