@@ -26,6 +26,14 @@
 #include "auxFunctions.h"
 
 #include <CL/sycl.hpp>
+// For min(T a, T b)
+
+// Implementation of the user-defined binary function.
+template <typename T>
+bool comp(T element1, T element2){
+    // Returning the smaller value.
+    return (element1 < element2);    
+}
 
 //Nothing-up-my-sleeve working constants from SHA-256.
 const uint dMD5K[64] = {0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -125,9 +133,12 @@ int main(int argc, char *argv[]) {
       return -1;
     }
   };
+  
   sycl::queue myQueue{CUDASelector};
-
+  std::cout << "Selected device : " <<
+  myQueue.get_device().get_info<sycl::info::device::name>() << "\n";
   const int numBlocks = graph.vertexNum;
+  const int nrVertices = graph.vertexNum;
 
   const size_t threadsPerBlock = 32;
   const size_t totalThreads = numBlocks * threadsPerBlock;
@@ -144,12 +155,13 @@ int main(int argc, char *argv[]) {
       auto km = keepMatching.get_access<write_t>();
       km[0] = false;
     }
-
     // Color vertices
+    // Request vertices - one workitem per workgroup
     // Command Group creation
     auto cg = [&](sycl::handler &h) {    
       const auto read_t = sycl::access::mode::read;
       const auto read_write_t = sycl::access::mode::read_write;
+      const auto dwrite_t = sycl::access::mode::discard_write;
 
       // dist
       auto sb = selectBarrier.get_access<read_t>(h);
@@ -159,6 +171,7 @@ int main(int argc, char *argv[]) {
       auto aMD5R = MD5R.get_access<read_t>(h);
 
       auto match_i = match.get_access<read_write_t>(h);
+      auto km = keepMatching.get_access<dwrite_t>(h);
 
       h.parallel_for(VertexSize,
                     [=](sycl::id<1> i) { 
@@ -168,6 +181,8 @@ int main(int argc, char *argv[]) {
         //Can this vertex still be matched?
         if (match_i[i] >= 2) return;
 
+        // Some vertices can still match.
+        km[0] = true;
         // TODO: template the hash functions in hashing/ for testing here.
         //Start hashing.
         uint h0 = 0x67452301, h1 = 0xefcdab89, h2 = 0x98badcfe, h3 = 0x10325476;
@@ -195,12 +210,145 @@ int main(int argc, char *argv[]) {
     };
     myQueue.submit(cg);
 
+    // Request vertices - one workitem per workgroup
+    // Command Group creation
+    auto cg2 = [&](sycl::handler &h) {    
+      const auto read_t = sycl::access::mode::read;
+      const auto write_t = sycl::access::mode::write;
+      const auto dwrite_t = sycl::access::mode::discard_write;
+      const auto read_write_t = sycl::access::mode::read_write;
+
+      auto rows_i = rows.get_access<read_t>(h);
+      auto cols_i = cols.get_access<read_t>(h);
+      auto match_i = match.get_access<read_t>(h);
+      auto requests_i = requests.get_access<dwrite_t>(h);
+
+
+      h.parallel_for(VertexSize,
+                    [=](sycl::id<1> src) {                         
+                        //Look at all blue vertices and let them make requests.
+                        if (match_i[src] == 0)
+                        {
+                          int dead = 1;
+                        
+                          for (auto col_index = rows_i[src]; col_index < rows_i[src+1]; ++col_index){
+                            auto col = cols_i[col_index];
+
+                            const auto nm = match_i[col];
+
+                            //Do we have an unmatched neighbour?
+                            if (nm < 4)
+                            {
+                              //Is this neighbour red?
+                              if (nm == 1)
+                              {
+                                //Propose to this neighbour.
+                                requests_i[src] = col;
+                                return;
+                              }
+                              
+                              dead = 0;
+                            }
+                          }
+
+                          requests_i[src] = nrVertices + dead;
+                        }
+                        else
+                        {
+                          //Clear request value.
+                          requests_i[src] = nrVertices;
+                        }                    
+      });
+    };
+    myQueue.submit(cg2);
+
+    // Respond vertices - one workitem per workgroup
+    // Command Group creation
+    auto cg3 = [&](sycl::handler &h) {    
+      const auto read_t = sycl::access::mode::read;
+      const auto write_t = sycl::access::mode::write;
+      const auto dwrite_t = sycl::access::mode::discard_write;
+      const auto read_write_t = sycl::access::mode::read_write;
+
+      auto rows_i = rows.get_access<read_t>(h);
+      auto cols_i = cols.get_access<read_t>(h);
+      auto match_i = match.get_access<read_t>(h);
+      auto requests_i = requests.get_access<read_write_t>(h);
+
+
+      h.parallel_for(VertexSize,
+                    [=](sycl::id<1> src) {                         
+                        //Look at all red vertices.
+                        if (match_i[src] == 1)
+                        {
+                          //Select first available proposer.
+                          for (auto col_index = rows_i[src]; col_index < rows_i[src+1]; ++col_index){
+                            auto col = cols_i[col_index];
+                            //Only respond to blue neighbours.
+                            if (match_i[col] == 0)
+                            {
+                              //Avoid data thrashing be only looking at the request value of blue neighbours.
+                              if (requests_i[col] == src)
+                              {
+                                requests_i[src] = col;
+                                return;
+                              }
+                            }
+                          }
+                        }               
+      });
+    };
+    myQueue.submit(cg3);
+
+    // Match vertices - one workitem per workgroup
+    // Command Group creation
+    auto cg4 = [&](sycl::handler &h) {    
+      const auto read_t = sycl::access::mode::read;
+      const auto write_t = sycl::access::mode::write;
+      const auto dwrite_t = sycl::access::mode::discard_write;
+      const auto read_write_t = sycl::access::mode::read_write;
+
+      auto match_i = match.get_access<dwrite_t>(h);
+      auto requests_i = requests.get_access<read_t>(h);
+
+
+      h.parallel_for(VertexSize,
+                    [=](sycl::id<1> src) {                         
+
+                        const auto r = requests_i[src];
+
+                        //Only unmatched vertices make requests.
+                        if (r == nrVertices + 1)
+                        {
+                          //This is vertex without any available neighbours, discard it.
+                          match_i[src] = 2;
+                        }
+                        else if (r < nrVertices)
+                        {
+                          //This vertex has made a valid request.
+                          if (requests_i[r] == src)
+                          {
+                            //Match the vertices if the request was mutual.
+                            // cant get this compile
+                            //  match_i[src] = 4 + min(src, r);
+                            if (src < r)
+                              match_i[src] = 4 + src;
+                            else 
+                              match_i[src] = 4 + r;
+                          }
+                        }            
+      });
+    };
+    myQueue.submit(cg4);
     {
       const auto read_t = sycl::access::mode::read;
       auto km = keepMatching.get_access<read_t>();
       flag = km[0];
     }
+    // just to keep from entering an inf loop till all matching logic is done.
+    flag = false;
   } while(flag);
+
   {
     const auto read_t = sycl::access::mode::read;
     const auto read_write_t = sycl::access::mode::read_write;
@@ -214,6 +362,7 @@ int main(int argc, char *argv[]) {
     }
     std::cout << "red count : " << cs[0] << std::endl;
     std::cout << "blue count : " << cs[1] << std::endl;
+    std::cout << "matched count : " << graph.vertexNum-(cs[0]+cs[1]) << std::endl;
   }
   return 0;
 }
