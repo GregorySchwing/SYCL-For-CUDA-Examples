@@ -75,6 +75,11 @@ static void usage()
             "                                  by the code according to the abilities of the\n"
             "                                  gpu and the size of the graph.\n"
             "\n"
+            "   -w <Match Barrier>                  Used to determine the distribution of \n"
+            "                                  red and blue vertices. Must be an Integer (0-16).\n"
+            "                                  If not determined by the user it will set to a \n"
+            "                                  default value for which p(red) = 0.534059.\n"
+            "\n"
             "\n");
 }
 
@@ -173,6 +178,8 @@ struct Config
     unsigned int startingDepth;
     const char *outputFilePrefix;
     const char *graphFileName;
+    unsigned int barrier;
+
 };
 
 static Config parseArgs(int argc, char **argv)
@@ -190,6 +197,7 @@ static Config parseArgs(int argc, char **argv)
     config.startingDepth = 4;
     config.outputFilePrefix = "1";
     config.graphFileName = "GraphInput.txt";
+    config.barrier = 0x88B81733;
 
     int opt;
     while ((opt = getopt(argc, argv, "v:f:o:i:k:q:t:d:b:g:n:h")) >= 0)
@@ -229,6 +237,9 @@ static Config parseArgs(int argc, char **argv)
             break;
         case 'n':
             config.numBlocks = atoi(optarg);
+            break;
+        case 'w':
+            config.barrier = atoi(optarg);
             break;
         case 'h':
             usage();
