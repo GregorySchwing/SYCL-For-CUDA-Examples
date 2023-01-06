@@ -1,0 +1,10 @@
+{
+	"name": "sycl-cuda",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+	"workspaceFolder": "/com.docker.devenvironments.code",
+	"extensions": [
+		"ms-azuretools.vscode-docker"
+	]
+}
