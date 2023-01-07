@@ -68,6 +68,7 @@ int main(int argc, char *argv[]) {
   printf("finished checking\n");
   constexpr const size_t SingletonSz = 1;
   constexpr const size_t DoubletonSz = 2;
+  constexpr const size_t TripletonSz = 3;
 
   const sycl::range RowSize{graph.vertexNum+1};
   const sycl::range ColSize{graph.edgeNum*2};
@@ -78,6 +79,7 @@ int main(int argc, char *argv[]) {
 
   const sycl::range Singleton{SingletonSz};
   const sycl::range Doubleton{DoubletonSz};
+  const sycl::range Tripleton{TripletonSz};
 
   // Device input vectors
   sycl::buffer<unsigned int> rows{graph.srcPtr, RowSize};
@@ -94,9 +96,8 @@ int main(int argc, char *argv[]) {
 
   // Determines distribution of red/blue
   sycl::buffer<unsigned int> selectBarrier {Singleton};
-  sycl::buffer<unsigned int> random {Singleton};
   sycl::buffer<bool> keepMatching{Singleton};
-  sycl::buffer<unsigned int> colsum {Doubleton};
+  sycl::buffer<unsigned int> colsum {Tripleton};
 
 
   // Initialize input data
@@ -109,18 +110,17 @@ int main(int argc, char *argv[]) {
 
     auto sb = selectBarrier.get_access<dwrite_t>();
     auto km = keepMatching.get_access<dwrite_t>();
-    auto rand = random.get_access<dwrite_t>();
     auto cs = colsum.get_access<dwrite_t>();
 
     for (int i = 0; i < graph.vertexNum; i++) {
       m[i] = 0;
       r[i] = 0;
     }
-    rand[0] = selectBarrier_default;
     sb[0] = selectBarrier_default;
     km[0] = true;
     cs[0] = 0;
     cs[1] = 0;
+    cs[2] = 0;
 
     std::cout << "selectBarrier " << sb[0] << std::endl;
   }
@@ -165,8 +165,7 @@ int main(int argc, char *argv[]) {
 
       // dist
       auto sb = selectBarrier.get_access<read_t>(h);
-      auto random_a = random.get_access<read_t>(h);
-
+      auto randNum = rand();
       auto aMD5K = MD5K.get_access<read_t>(h);
       auto aMD5R = MD5R.get_access<read_t>(h);
 
@@ -202,8 +201,7 @@ int main(int argc, char *argv[]) {
           h1 += b;
           h2 += c;
           h3 += d;
-
-          g *= random_a[0];
+          g *= randNum;
         }
         match_i[i] = ((h0 + h1 + h2 + h3) < sb[0] ? 0 : 1);
       });
@@ -339,41 +337,58 @@ int main(int argc, char *argv[]) {
                         }            
       });
     };
-    myQueue.submit(cg4);
+    myQueue.submit(cg4);    
+
     {
       const auto read_t = sycl::access::mode::read;
       auto km = keepMatching.get_access<read_t>();
       flag = km[0];
     }
+
+    {
+      const auto read_t = sycl::access::mode::read;
+      const auto read_write_t = sycl::access::mode::read_write;
+
+      auto m = match.get_access<read_t>();
+      auto cs = colsum.get_access<read_write_t>();
+      cs[0] = 0;
+      cs[1] = 0;
+      cs[2] = 0;
+
+      for (int i = 0; i < graph.vertexNum; i++) {
+        if(m[i] < 4)
+          ++cs[m[i]];
+        //printf("%d %d\n",i,m[i]);
+      }
+      std::cout << "red count : " << cs[0] << std::endl;
+      std::cout << "blue count : " << cs[1] << std::endl;
+      std::cout << "dead count : " << cs[2] << std::endl;
+      std::cout << "matched count : " << graph.vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
+    }
+    
     // just to keep from entering an inf loop till all matching logic is done.
-    flag = false;
+    //flag = false;
   } while(flag);
-  /*
+
   {
     const auto read_t = sycl::access::mode::read;
     const auto read_write_t = sycl::access::mode::read_write;
 
     auto m = match.get_access<read_t>();
     auto cs = colsum.get_access<read_write_t>();
+    cs[0] = 0;
+    cs[1] = 0;
 
     for (int i = 0; i < graph.vertexNum; i++) {
-      ++cs[m[i]];
+      if(m[i] < 4)
+        ++cs[m[i]];
       //printf("%d %d\n",i,m[i]);
     }
     std::cout << "red count : " << cs[0] << std::endl;
     std::cout << "blue count : " << cs[1] << std::endl;
     std::cout << "matched count : " << graph.vertexNum-(cs[0]+cs[1]) << std::endl;
   }
-  */
-{
-    const auto read_t = sycl::access::mode::read;
-
-    auto m = match.get_access<read_t>();
-
-    for (int i = 0; i < graph.vertexNum; i++) {
-      printf("%d %d\n", i, m[i]);
-    }
-  }
+  
 
   return 0;
 }
