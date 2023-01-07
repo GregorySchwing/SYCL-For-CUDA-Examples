@@ -23,7 +23,7 @@
 #include <vector>
 #include <CL/sycl.hpp>
 
-void bfs(sycl::queue &q, 
+void alternatingBFSTree(sycl::queue &q, 
                 sycl::buffer<unsigned int> &rows, 
                 sycl::buffer<unsigned int> &cols, 
                 sycl::buffer<int> &dist,

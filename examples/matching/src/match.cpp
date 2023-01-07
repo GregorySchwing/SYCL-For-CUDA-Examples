@@ -24,7 +24,7 @@
 #include "config.h"
 #include "CSRGraphRep.h"
 #include "auxFunctions.h"
-#include "bfs.h"
+#include "alternatingBFSTree.h"
 
 #include <CL/sycl.hpp>
 // For min(T a, T b)
