@@ -92,6 +92,8 @@ void alternatingBFSTree(sycl::queue &q,
       auto rows_i = rows.get_access<read_t>(h);
       auto cols_i = cols.get_access<read_t>(h);
       auto depth_i = depth.get_access<read_t>(h);
+      auto match_i = match.get_access<read_t>(h);
+
       auto expanded_i = expanded.get_access<write_t>(h);
       auto dist_i = dist.get_access<read_write_t>(h);
 
@@ -111,9 +113,16 @@ void alternatingBFSTree(sycl::queue &q,
                           // atomic isn't neccessary since I don't set predecessor.
                           // even if I set predecessor, all races remain in the universe of
                           // valid solutions.
-                          if (dist_i[col] == -1){
-                            dist_i[col] = dist_i[src] + 1;
-                            expanded_i[0] = 1;
+                          if (depth_i[0] % 2 == 0){
+                            if (dist_i[col] == -1){
+                              dist_i[col] = dist_i[src] + 1;
+                              expanded_i[0] = 1;
+                            }
+                          }else{
+                            if (dist_i[col] == -1 && (match_i[src] == match_i[col])){
+                              dist_i[col] = dist_i[src] + 1;
+                              expanded_i[0] = 1;
+                            }
                           }
                         }                     
       });
