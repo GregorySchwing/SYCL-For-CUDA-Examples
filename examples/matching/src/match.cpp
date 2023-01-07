@@ -67,6 +67,7 @@ int main(int argc, char *argv[]) {
   CSRGraph graph = createCSRGraphFromFile(config.graphFileName);
   performChecks(graph, config);
   printf("finished checking\n");
+
   constexpr const size_t SingletonSz = 1;
   constexpr const size_t DoubletonSz = 2;
   constexpr const size_t TripletonSz = 3;
@@ -75,8 +76,6 @@ int main(int argc, char *argv[]) {
   const sycl::range ColSize{graph.edgeNum*2};
   const sycl::range VertexSize{graph.vertexNum};
   const sycl::range HashSize{hashArraySize};
-
-  
 
   const sycl::range Singleton{SingletonSz};
   const sycl::range Doubleton{DoubletonSz};
@@ -375,12 +374,14 @@ int main(int argc, char *argv[]) {
     //flag = false;
   } while(flag);
 
+
   {
     const auto read_t = sycl::access::mode::read;
     const auto read_write_t = sycl::access::mode::read_write;
 
     auto m = match.get_access<read_t>();
     auto cs = colsum.get_access<read_write_t>();
+
     cs[0] = 0;
     cs[1] = 0;
     cs[2] = 0;
@@ -394,8 +395,18 @@ int main(int argc, char *argv[]) {
     std::cout << "blue count : " << cs[1] << std::endl;
     std::cout << "dead count : " << cs[2] << std::endl;
     std::cout << "matched count : " << graph.vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
-  }
   
+  }
+
+  // Initialize input data
+  sycl::buffer<int> dist{VertexSize};
+  
+  bfs(myQueue,
+      rows, 
+      cols, 
+      dist,
+      degree,
+      graph.vertexNum);
 
   return 0;
 }

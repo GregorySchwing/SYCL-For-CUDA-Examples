@@ -26,8 +26,8 @@
 void bfs(sycl::queue &q, 
                 sycl::buffer<unsigned int> &rows, 
                 sycl::buffer<unsigned int> &cols, 
-                sycl::buffer<unsigned int> &dist,
-                sycl::buffer<unsigned int> &degree,
+                sycl::buffer<int> &dist,
+                sycl::buffer<int> &degree,
                 int vertexNum){
 
   constexpr const size_t SingletonSz = 1;
