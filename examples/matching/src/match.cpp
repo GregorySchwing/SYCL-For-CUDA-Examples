@@ -401,13 +401,13 @@ int main(int argc, char *argv[]) {
   // Initialize input data
   sycl::buffer<int> dist{VertexSize};
   
-  bfs(myQueue,
-      rows, 
-      cols, 
-      dist,
-      degree,
-      match,
-      graph.vertexNum);
+  alternatingBFSTree(myQueue,
+                    rows, 
+                    cols, 
+                    dist,
+                    degree,
+                    match,
+                    graph.vertexNum);
 
   return 0;
 }
