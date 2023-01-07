@@ -34,8 +34,6 @@ void alternatingBFSTree(sycl::queue &q,
   constexpr const size_t SingletonSz = 1;
 
   const sycl::range Singleton{SingletonSz};
-  // Start
-  sycl::buffer<int> start{Singleton};
   // Depth
   sycl::buffer<int> depth{Singleton};
   // Expanded
@@ -48,27 +46,20 @@ void alternatingBFSTree(sycl::queue &q,
     const auto dwrite_t = sycl::access::mode::discard_write;
     const auto read_write_t = sycl::access::mode::read_write;
     auto deg = degree.get_access<read_t>();
+    auto m = match.get_access<read_t>();
+
     auto d = dist.get_access<dwrite_t>();
-    auto s = start.get_access<read_write_t>();
     auto dep = depth.get_access<dwrite_t>();
     auto exp = expanded.get_access<dwrite_t>();
 
     for (int i = 0; i < vertexNum; i++) {
-      if (match[i] < 4)
+      if (m[i] < 4)
         d[i] = 0;
       else
         d[i] = -1;
-      // Found an elibible start
-      // Set its distance to itself as 0
-      // Set the start vertex
-      if(!s[0] && deg[i]){ 
-        d[i] = 0;
-        s[0] = i;
-      }
     }
     dep[0] = 0;
     exp[0] = 0;
-    std::cout << "start " << s[0] << " degree " << deg[s[0]] << std::endl;
   }
 
   const int numBlocks = vertexNum;
@@ -147,11 +138,10 @@ void alternatingBFSTree(sycl::queue &q,
 
   {
     const auto read_t = sycl::access::mode::read;
-    auto s = start.get_access<read_t>();
     auto d = dist.get_access<read_t>();
     auto dep = depth.get_access<read_t>();
 
-    std::cout << "Distance from start " << s[0] << " is : " << std::endl;
+    std::cout << "Distance from start is : " << std::endl;
     for (int depth_to_print = 0; depth_to_print <= dep[0]; depth_to_print++) {
       for (int i = 0; i < vertexNum; i++) {
         if (d[i] == depth_to_print) printf("vertex %d dist %d\n",i, d[i]);
