@@ -400,11 +400,22 @@ int main(int argc, char *argv[]) {
 
   // Initialize input data
   sycl::buffer<int> dist{VertexSize};
-  
+  sycl::buffer<int> pred{VertexSize};
+
+  /*
   alternatingBFSTree(myQueue,
                     rows, 
                     cols, 
                     dist,
+                    degree,
+                    match,
+                    graph.vertexNum);
+  */
+  alternatingBFSTree(myQueue,
+                    rows, 
+                    cols, 
+                    dist,
+                    pred,
                     degree,
                     match,
                     graph.vertexNum);
