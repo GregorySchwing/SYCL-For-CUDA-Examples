@@ -155,6 +155,7 @@ int main(int argc, char *argv[]) {
       auto km = keepMatching.get_access<write_t>();
       km[0] = false;
     }
+
     // Color vertices
     // Request vertices - one workitem per workgroup
     // Command Group creation
@@ -162,6 +163,7 @@ int main(int argc, char *argv[]) {
       const auto read_t = sycl::access::mode::read;
       const auto read_write_t = sycl::access::mode::read_write;
       const auto dwrite_t = sycl::access::mode::discard_write;
+      const auto write_t = sycl::access::mode::write;
 
       // dist
       auto sb = selectBarrier.get_access<read_t>(h);
@@ -170,7 +172,7 @@ int main(int argc, char *argv[]) {
       auto aMD5R = MD5R.get_access<read_t>(h);
 
       auto match_i = match.get_access<read_write_t>(h);
-      auto km = keepMatching.get_access<dwrite_t>(h);
+      auto km = keepMatching.get_access<write_t>(h);
 
       h.parallel_for(VertexSize,
                     [=](sycl::id<1> i) { 
@@ -179,9 +181,10 @@ int main(int argc, char *argv[]) {
 
         //Can this vertex still be matched?
         if (match_i[i] >= 2) return;
-
-        // Some vertices can still match.
+        
+        // cant be type dwrite_t (must be write_t) or this is always reacher somehow.
         km[0] = true;
+        // Some vertices can still match.
         // TODO: template the hash functions in hashing/ for testing here.
         //Start hashing.
         uint h0 = 0x67452301, h1 = 0xefcdab89, h2 = 0x98badcfe, h3 = 0x10325476;
@@ -337,7 +340,7 @@ int main(int argc, char *argv[]) {
                         }            
       });
     };
-    myQueue.submit(cg4);    
+    myQueue.submit(cg4);  
 
     {
       const auto read_t = sycl::access::mode::read;
