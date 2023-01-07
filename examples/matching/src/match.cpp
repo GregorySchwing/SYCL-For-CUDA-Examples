@@ -406,6 +406,7 @@ int main(int argc, char *argv[]) {
       cols, 
       dist,
       degree,
+      match,
       graph.vertexNum);
 
   return 0;

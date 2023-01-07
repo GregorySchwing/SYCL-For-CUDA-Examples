@@ -28,6 +28,7 @@ void bfs(sycl::queue &q,
                 sycl::buffer<unsigned int> &cols, 
                 sycl::buffer<int> &dist,
                 sycl::buffer<int> &degree,
+                sycl::buffer<int> &match,
                 int vertexNum){
 
   constexpr const size_t SingletonSz = 1;
@@ -53,7 +54,10 @@ void bfs(sycl::queue &q,
     auto exp = expanded.get_access<dwrite_t>();
 
     for (int i = 0; i < vertexNum; i++) {
-      d[i] = -1;
+      if (match[i] < 4)
+        d[i] = 0;
+      else
+        d[i] = -1;
       // Found an elibible start
       // Set its distance to itself as 0
       // Set the start vertex
