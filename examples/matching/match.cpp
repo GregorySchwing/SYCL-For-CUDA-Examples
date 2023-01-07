@@ -348,6 +348,7 @@ int main(int argc, char *argv[]) {
       flag = km[0];
     }
 
+    #ifdef NDEBUG
     {
       const auto read_t = sycl::access::mode::read;
       const auto read_write_t = sycl::access::mode::read_write;
@@ -368,7 +369,7 @@ int main(int argc, char *argv[]) {
       std::cout << "dead count : " << cs[2] << std::endl;
       std::cout << "matched count : " << graph.vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
     }
-    
+    #endif
     // just to keep from entering an inf loop till all matching logic is done.
     //flag = false;
   } while(flag);
@@ -381,6 +382,7 @@ int main(int argc, char *argv[]) {
     auto cs = colsum.get_access<read_write_t>();
     cs[0] = 0;
     cs[1] = 0;
+    cs[2] = 0;
 
     for (int i = 0; i < graph.vertexNum; i++) {
       if(m[i] < 4)
@@ -389,7 +391,8 @@ int main(int argc, char *argv[]) {
     }
     std::cout << "red count : " << cs[0] << std::endl;
     std::cout << "blue count : " << cs[1] << std::endl;
-    std::cout << "matched count : " << graph.vertexNum-(cs[0]+cs[1]) << std::endl;
+    std::cout << "dead count : " << cs[2] << std::endl;
+    std::cout << "matched count : " << graph.vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
   }
   
 
