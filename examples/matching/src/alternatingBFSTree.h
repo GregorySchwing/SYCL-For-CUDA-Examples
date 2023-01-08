@@ -170,9 +170,12 @@ void alternatingBFSTree(sycl::queue &q,
                 sycl::buffer<unsigned int> &cols, 
                 sycl::buffer<int> &dist,
                 sycl::buffer<int> &pred,
+                sycl::buffer<int> &start,
+                sycl::buffer<int> &winningAP,
+                sycl::buffer<int> &requests,
                 sycl::buffer<int> &degree,
                 sycl::buffer<int> &match,
-                int vertexNum){
+                const int vertexNum){
 
   constexpr const size_t SingletonSz = 1;
 
@@ -190,26 +193,33 @@ void alternatingBFSTree(sycl::queue &q,
     const auto read_write_t = sycl::access::mode::read_write;
     auto deg = degree.get_access<read_t>();
     auto m = match.get_access<read_t>();
+    auto r = requests.get_access<dwrite_t>();
 
     auto d = dist.get_access<dwrite_t>();    
     auto p = pred.get_access<dwrite_t>();
+    auto s = start.get_access<dwrite_t>();
+    auto wAP = winningAP.get_access<dwrite_t>();
 
-    
     auto dep = depth.get_access<dwrite_t>();
     auto exp = expanded.get_access<dwrite_t>();
-
     for (int i = 0; i < vertexNum; i++) {
-      if (m[i] < 4)
+      if (m[i] < 4){
         d[i] = 0;
-      else
+        s[i] = i;
+      } else {
         d[i] = -1;
+        s[i] = -1;
+      }
+      r[i] = 0;
       p[i] = -1;
+      wAP[i] = -1;
     }
     dep[0] = 0;
     exp[0] = 0;
   }
 
-  const int numBlocks = vertexNum;
+  const size_t numBlocks = vertexNum;
+  const sycl::range VertexSize{numBlocks};
 
   const size_t threadsPerBlock = 32;
   const size_t totalThreads = numBlocks * threadsPerBlock;
@@ -288,6 +298,26 @@ void alternatingBFSTree(sycl::queue &q,
     };
     q.submit(cg2);
 
+    // Necessary to avoid atomics in setting pred/dist/start
+    // Conflicts could come from setting pred and start non-atomically.
+    // (Push phase) As dist is race-proof, only set pred in the frontier expansion 
+    // (Pull phase) pull start into new frontier.
+    // Command Group creation
+    auto cg3 = [&](sycl::handler &h) {    
+      const auto read_t = sycl::access::mode::read;
+      const auto write_t = sycl::access::mode::write;
+      auto depth_i = depth.get_access<read_t>(h);
+      auto dist_i = dist.get_access<read_t>(h);
+      auto pred_i = pred.get_access<read_t>(h);
+      auto start_i = start.get_access<write_t>(h);
+      h.parallel_for(VertexSize,
+                    [=](sycl::id<1> i) { 
+          if(depth_i[0] == dist_i[i]) 
+            start_i[i] = start_i[pred_i[i]];
+       });
+    };
+    q.submit(cg3);
+
     {
       const auto read_t = sycl::access::mode::read;
       auto exp = expanded.get_access<read_t>();
@@ -295,15 +325,51 @@ void alternatingBFSTree(sycl::queue &q,
     }
   } while(flag);
 
+
+
+  // To augment paths in parallel, the source vertex cannot be shared.
+  // This uses races to set the winningAugmentingPath to be a the deepest
+  // vertex in an M-alternating path of edge type B (case 1).
+  // Case 1 is preferred since blossoms (Case 2) require extra work to
+  // identify the common ancestor vertex.
+  auto cg4 = [&](sycl::handler &h) {    
+    const auto read_t = sycl::access::mode::read;
+    const auto write_t = sycl::access::mode::write;
+    auto depth_i = depth.get_access<read_t>(h);
+    auto dist_i = dist.get_access<read_t>(h);
+    auto match_i = match.get_access<read_t>(h);
+    auto start_i = start.get_access<read_t>(h);
+
+    // use same scheme as matching (0,1,2, 4..n)
+    auto wAP_i = winningAP.get_access<write_t>(h);
+
+      h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
+                        sycl::group<1> gr = item.get_group();
+                        sycl::range<1> r = gr.get_local_range();
+                        size_t src = gr.get_group_linear_id();
+                        size_t blockDim = r[0];
+                        size_t threadIdx = item.get_local_id();
+                        // This is a possible augmenting path
+                        // We only continually check the start is unmatched
+                        // since this will loop from depth k to depth 1
+                        if(depth_i[0] == dist_i[src] && match_i[start_i[src]] < 4) {
+
+                        }else
+                          return;
+      });
+  };
+  q.submit(cg4);
+
   {
     const auto read_t = sycl::access::mode::read;
     auto d = dist.get_access<read_t>();
+    auto s = start.get_access<read_t>();
     auto dep = depth.get_access<read_t>();
 
     std::cout << "Distance from start is : " << std::endl;
     for (int depth_to_print = 0; depth_to_print <= dep[0]; depth_to_print++) {
       for (int i = 0; i < vertexNum; i++) {
-        if (d[i] == depth_to_print) printf("vertex %d dist %d\n",i, d[i]);
+        if (d[i] == depth_to_print) printf("vertex %d dist %d start %d\n",i, d[i], s[i]);
       }
     }
     std::cout << std::endl;
