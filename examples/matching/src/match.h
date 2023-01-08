@@ -641,50 +641,59 @@ void maximalMatching(sycl::queue &q,
                 const size_t vertexNum,
                 const unsigned int barrier = 0x88B81733){
 
-  constexpr const size_t SingletonSz = 1;
-  const sycl::range Singleton{SingletonSz};
+    constexpr const size_t SingletonSz = 1;
+    const sycl::range Singleton{SingletonSz};
 
-  constexpr const size_t TripletonSz = 3;
-  const sycl::range Tripleton{TripletonSz};
+    constexpr const size_t TripletonSz = 3;
+    const sycl::range Tripleton{TripletonSz};
 
-  const sycl::range VertexSize{vertexNum};
+    const sycl::range VertexSize{vertexNum};
 
-  // Determines distribution of red/blue
-  sycl::buffer<unsigned int> selectBarrier {Singleton};
-  sycl::buffer<bool> keepMatching{Singleton};
-  sycl::buffer<unsigned int> colsum {Tripleton};
+    // Determines distribution of red/blue
+    sycl::buffer<unsigned int> selectBarrier {Singleton};
+    sycl::buffer<bool> keepMatching{Singleton};
+    sycl::buffer<unsigned int> colsum {Tripleton};
 
-  // Initialize input data
-  {
-    const auto read_t = sycl::access::mode::read;
-    const auto dwrite_t = sycl::access::mode::discard_write;
-    //auto deg = degree.get_access<read_t>();
-    auto m = match.get_access<dwrite_t>();
-    auto r = requests.get_access<dwrite_t>();
+    // Initialize input data
+    {
+        const auto read_t = sycl::access::mode::read;
+        const auto dwrite_t = sycl::access::mode::discard_write;
+        //auto deg = degree.get_access<read_t>();
+        auto m = match.get_access<dwrite_t>();
+        auto r = requests.get_access<dwrite_t>();
 
-    auto sb = selectBarrier.get_access<dwrite_t>();
-    auto km = keepMatching.get_access<dwrite_t>();
-    auto cs = colsum.get_access<dwrite_t>();
+        auto sb = selectBarrier.get_access<dwrite_t>();
+        auto km = keepMatching.get_access<dwrite_t>();
+        auto cs = colsum.get_access<dwrite_t>();
 
-    for (int i = 0; i < vertexNum; i++) {
-      m[i] = 0;
-      r[i] = 0;
+        auto depth_i = depth.get_access<read_t>();
+        auto dist_i = dist.get_access<read_t>();
+        printf("matching inside depth %u\n", depth_i[0]);
+        for (int i = 0; i < vertexNum; i++) {
+            // Even levels greater than 0.
+            if (dist_i[i] % 2 == 0 && dist_i[i]){
+                m[i] = 2;
+                r[i] = vertexNum + 1;
+            }else {
+                m[i] = 0;
+                r[i] = 0;
+            }
+        }
+        sb[0] = barrier;
+        km[0] = true;
+        cs[0] = 0;
+        cs[1] = 0;
+        cs[2] = 0;
+
+        std::cout << "selectBarrier " << sb[0] << std::endl;
     }
-    sb[0] = barrier;
-    km[0] = true;
-    cs[0] = 0;
-    cs[1] = 0;
-    cs[2] = 0;
-
-    std::cout << "selectBarrier " << sb[0] << std::endl;
-  }
 
     bool flag = false;
     do{
         {
-        const auto write_t = sycl::access::mode::write;
-        auto km = keepMatching.get_access<write_t>();
-        km[0] = false;
+            const auto write_t = sycl::access::mode::write;
+            auto km = keepMatching.get_access<write_t>();
+            km[0] = false;
         }
 
         // Color vertices
@@ -713,8 +722,7 @@ void maximalMatching(sycl::queue &q,
                 // if (i >= vertexNum) return;
 
                 //Can this vertex still be matched?
-                if (match_i[i] >= 2  || depth_i[0] != dist_i[i]) return;
-                
+                if (match_i[i] >= 2) return;
                 // cant be type dwrite_t (must be write_t) or this is always reacher somehow.
                 km[0] = true;
                 // Some vertices can still match.
@@ -725,21 +733,22 @@ void maximalMatching(sycl::queue &q,
 
                 for (int j = 0; j < 16; ++j)
                 {
-                f = (b & c) | ((~b) & d);
+                    f = (b & c) | ((~b) & d);
 
-                e = d;
-                d = c;
-                c = b;
-                b += LEFTROTATE(a + f + aMD5K[j] + g, aMD5R[j]);
-                a = e;
+                    e = d;
+                    d = c;
+                    c = b;
+                    b += LEFTROTATE(a + f + aMD5K[j] + g, aMD5R[j]);
+                    a = e;
 
-                h0 += a;
-                h1 += b;
-                h2 += c;
-                h3 += d;
-                g *= randNum;
+                    h0 += a;
+                    h1 += b;
+                    h2 += c;
+                    h3 += d;
+                    g *= randNum;
                 }
                 match_i[i] = ((h0 + h1 + h2 + h3) < sb[0] ? 0 : 1);
+                //printf("vertex %u colored %d\n", i[0],match_i[i] );
             });
         };
         q.submit(cg);
@@ -756,6 +765,7 @@ void maximalMatching(sycl::queue &q,
         auto cols_i = cols.get_access<read_t>(h);
         auto match_i = match.get_access<read_t>(h);
         auto requests_i = requests.get_access<dwrite_t>(h);
+        auto dist_i = dist.get_access<read_t>(h);
 
 
         h.parallel_for(VertexSize,
@@ -763,34 +773,34 @@ void maximalMatching(sycl::queue &q,
                             //Look at all blue vertices and let them make requests.
                             if (match_i[src] == 0)
                             {
-                            int dead = 1;
-                            
-                            for (auto col_index = rows_i[src]; col_index < rows_i[src+1]; ++col_index){
-                                auto col = cols_i[col_index];
-
-                                const auto nm = match_i[col];
-
-                                //Do we have an unmatched neighbour?
-                                if (nm < 4)
-                                {
-                                //Is this neighbour red?
-                                if (nm == 1)
-                                {
-                                    //Propose to this neighbour.
-                                    requests_i[src] = col;
-                                    return;
-                                }
+                                int dead = 1;
                                 
-                                dead = 0;
-                                }
-                            }
+                                for (auto col_index = rows_i[src]; col_index < rows_i[src+1]; ++col_index){
+                                    auto col = cols_i[col_index];
 
-                            requests_i[src] = vertexNum + dead;
+                                    const auto nm = match_i[col];
+
+                                    //Do we have an unmatched neighbour in my level?
+                                    if (nm < 2 && dist_i[src]==dist_i[col])
+                                    {
+                                    //Is this neighbour red?
+                                    if (nm == 1)
+                                    {
+                                        //Propose to this neighbour.
+                                        requests_i[src] = col;
+                                        return;
+                                    }
+                                    
+                                    dead = 0;
+                                    }
+                                }
+
+                                requests_i[src] = vertexNum + dead;
                             }
                             else
                             {
-                            //Clear request value.
-                            requests_i[src] = vertexNum;
+                                //Clear request value.
+                                requests_i[src] = vertexNum;
                             }                    
         });
         };
@@ -808,6 +818,7 @@ void maximalMatching(sycl::queue &q,
         auto cols_i = cols.get_access<read_t>(h);
         auto match_i = match.get_access<read_t>(h);
         auto requests_i = requests.get_access<read_write_t>(h);
+        auto dist_i = dist.get_access<read_t>(h);
 
 
         h.parallel_for(VertexSize,
@@ -815,20 +826,20 @@ void maximalMatching(sycl::queue &q,
                             //Look at all red vertices.
                             if (match_i[src] == 1)
                             {
-                            //Select first available proposer.
-                            for (auto col_index = rows_i[src]; col_index < rows_i[src+1]; ++col_index){
-                                auto col = cols_i[col_index];
-                                //Only respond to blue neighbours.
-                                if (match_i[col] == 0)
-                                {
-                                //Avoid data thrashing be only looking at the request value of blue neighbours.
-                                if (requests_i[col] == src)
-                                {
-                                    requests_i[src] = col;
-                                    return;
+                                //Select first available proposer.
+                                for (auto col_index = rows_i[src]; col_index < rows_i[src+1]; ++col_index){
+                                    auto col = cols_i[col_index];
+                                    //Only respond to blue neighbours in my level.
+                                    if (match_i[col] == 0  && dist_i[src]==dist_i[col])
+                                    {
+                                        //Avoid data thrashing be only looking at the request value of blue neighbours.
+                                        if (requests_i[col] == src)
+                                        {
+                                            requests_i[src] = col;
+                                            return;
+                                        }
+                                    }
                                 }
-                                }
-                            }
                             }               
         });
         };
@@ -928,7 +939,7 @@ void maximalMatching(sycl::queue &q,
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
         std::cout << "matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
-    
+        std::cout << "matches are either blossoms or augmenting paths" << std::endl;
     }
     return;
 }
