@@ -668,7 +668,7 @@ void maximalMatching(sycl::queue &q,
 
         auto depth_i = depth.get_access<read_t>();
         auto dist_i = dist.get_access<read_t>();
-        printf("matching inside depth %u\n", depth_i[0]);
+        printf("matching inside even depths > 0\n");
         for (int i = 0; i < vertexNum; i++) {
             // Even levels greater than 0.
             if (dist_i[i] % 2 == 0 && dist_i[i]){
@@ -781,6 +781,7 @@ void maximalMatching(sycl::queue &q,
                                     const auto nm = match_i[col];
 
                                     //Do we have an unmatched neighbour in my level?
+                                    //Use <2 in this if-conditon so odd levels can start dead.
                                     if (nm < 2 && dist_i[src]==dist_i[col])
                                     {
                                     //Is this neighbour red?
