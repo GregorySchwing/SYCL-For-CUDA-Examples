@@ -129,5 +129,16 @@ int main(int argc, char *argv[]) {
   // To identify one and only one Augmenting path 
   // to use the starting v.
   sycl::buffer<int> winningAP{VertexSize};
+  sycl::buffer<int> auxMatch{VertexSize};
+
+  maximalMatching(myQueue, 
+                  rows, 
+                  cols, 
+                  requests,
+                  auxMatch,
+                  dist,
+                  depth,
+                  graph.vertexNum,
+                  config.barrier);
   return 0;
 }

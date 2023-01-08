@@ -58,7 +58,7 @@ void alternatingBFSTree(sycl::queue &q,
       else
         d[i] = -1;
     }
-    dep[0] = 0;
+    dep[0] = -1;
     exp[0] = 0;
   }
 
@@ -189,8 +189,8 @@ void alternatingBFSTree(sycl::queue &q,
     const auto dwrite_t = sycl::access::mode::discard_write;
     const auto read_write_t = sycl::access::mode::read_write;
     auto deg = degree.get_access<read_t>();
-    auto m = match.get_access<read_t>();
 
+    auto m = match.get_access<read_t>();
     auto d = dist.get_access<dwrite_t>();    
     auto p = pred.get_access<dwrite_t>();
     auto s = start.get_access<dwrite_t>();
@@ -200,14 +200,13 @@ void alternatingBFSTree(sycl::queue &q,
     for (int i = 0; i < vertexNum; i++) {
       if (m[i] < 4){
         d[i] = 0;
-        s[i] = i;
       } else {
         d[i] = -1;
-        s[i] = -1;
       }
-      p[i] = -1;
+      s[i] = i;
+      p[i] = i;
     }
-    dep[0] = 0;
+    dep[0] = -1;
     exp[0] = 0;
   }
 
@@ -235,6 +234,36 @@ void alternatingBFSTree(sycl::queue &q,
 
     // Command Group creation
     auto cg = [&](sycl::handler &h) {    
+      const auto read_write_t = sycl::access::mode::read_write;
+      auto dep = depth.get_access<read_write_t>(h);
+      h.parallel_for(Singleton,
+                    [=](sycl::id<1> i) { dep[0] = dep[0]+1; });
+    };
+    q.submit(cg);
+
+
+    // Necessary to avoid atomics in setting pred/dist/start
+    // Conflicts could come from setting pred and start non-atomically.
+    // (Push phase) As dist is race-proof, only set pred in the frontier expansion 
+    // (Pull phase) pull start into new frontier.
+    // Command Group creation
+    auto cg3 = [&](sycl::handler &h) {    
+      const auto read_t = sycl::access::mode::read;
+      const auto write_t = sycl::access::mode::write;
+      auto depth_i = depth.get_access<read_t>(h);
+      auto dist_i = dist.get_access<read_t>(h);
+      auto pred_i = pred.get_access<read_t>(h);
+      auto start_i = start.get_access<write_t>(h);
+      h.parallel_for(VertexSize,
+                    [=](sycl::id<1> i) { 
+        if(depth_i[0] == dist_i[i]) 
+          start_i[i] = start_i[pred_i[i]];
+      });
+    };
+    q.submit(cg3);
+
+    // Command Group creation
+    auto cg2 = [&](sycl::handler &h) {    
       const auto read_t = sycl::access::mode::read;
       const auto write_t = sycl::access::mode::write;
       const auto read_write_t = sycl::access::mode::read_write;
@@ -280,36 +309,7 @@ void alternatingBFSTree(sycl::queue &q,
                         }                     
       });
     };
-    q.submit(cg);
-
-    // Command Group creation
-    auto cg2 = [&](sycl::handler &h) {    
-      const auto read_write_t = sycl::access::mode::read_write;
-      auto dep = depth.get_access<read_write_t>(h);
-      h.parallel_for(Singleton,
-                    [=](sycl::id<1> i) { dep[0] = dep[0]+1; });
-    };
     q.submit(cg2);
-
-    // Necessary to avoid atomics in setting pred/dist/start
-    // Conflicts could come from setting pred and start non-atomically.
-    // (Push phase) As dist is race-proof, only set pred in the frontier expansion 
-    // (Pull phase) pull start into new frontier.
-    // Command Group creation
-    auto cg3 = [&](sycl::handler &h) {    
-      const auto read_t = sycl::access::mode::read;
-      const auto write_t = sycl::access::mode::write;
-      auto depth_i = depth.get_access<read_t>(h);
-      auto dist_i = dist.get_access<read_t>(h);
-      auto pred_i = pred.get_access<read_t>(h);
-      auto start_i = start.get_access<write_t>(h);
-      h.parallel_for(VertexSize,
-                    [=](sycl::id<1> i) { 
-          if(depth_i[0] == dist_i[i]) 
-            start_i[i] = start_i[pred_i[i]];
-       });
-    };
-    q.submit(cg3);
 
     {
       const auto read_t = sycl::access::mode::read;
