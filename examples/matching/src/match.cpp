@@ -26,6 +26,7 @@
 #include "auxFunctions.h"
 #include "alternatingBFSTree.h"
 #include "match.h"
+#include "augment.h"
 
 #include <CL/sycl.hpp>
 // For min(T a, T b)
@@ -106,16 +107,6 @@ int main(int argc, char *argv[]) {
 
   sycl::buffer<int> depth{Singleton};
 
-  /*
-  alternatingBFSTree(myQueue,
-                    rows, 
-                    cols, 
-                    dist,
-                    degree,
-                    match,
-                    graph.vertexNum);
-  */
-  
   alternatingBFSTree(myQueue, 
                     rows, 
                     cols, 
@@ -131,6 +122,12 @@ int main(int argc, char *argv[]) {
   sycl::buffer<int> winningAP{VertexSize};
   sycl::buffer<int> auxMatch{VertexSize};
 
+  // Match inside even levels > 0 to avoid race conditions
+  // in blossoms/augmenting paths.  For example consider a 
+  // cycle represented by a circular linked list of odd length n.
+  // If each vertex in the level tried creating an augmenting path 
+  // with its rightside vertex, the entire level would augment, 
+  // but at (2/3)n can be in an forest of disjoint augmenting paths.
   maximalMatching(myQueue, 
                   rows, 
                   cols, 
@@ -140,5 +137,7 @@ int main(int argc, char *argv[]) {
                   depth,
                   graph.vertexNum,
                   config.barrier);
+
+  
   return 0;
 }
