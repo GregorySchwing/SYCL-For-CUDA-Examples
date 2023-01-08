@@ -103,9 +103,9 @@ int main(int argc, char *argv[]) {
   // in the forest.  This is necessary to ensure, two
   // augmenting paths/blossoms don't share a start.
   sycl::buffer<int> start{VertexSize};
-  // To identify one and only one Augmenting path 
-  // to use the starting v.
-  sycl::buffer<int> winningAP{VertexSize};
+
+  sycl::buffer<int> depth{Singleton};
+
   /*
   alternatingBFSTree(myQueue,
                     rows, 
@@ -115,17 +115,19 @@ int main(int argc, char *argv[]) {
                     match,
                     graph.vertexNum);
   */
-  alternatingBFSTree(myQueue,
+  
+  alternatingBFSTree(myQueue, 
                     rows, 
                     cols, 
                     dist,
                     pred,
                     start,
-                    winningAP,
-                    requests,
+                    depth,
                     degree,
                     match,
                     graph.vertexNum);
-
+  // To identify one and only one Augmenting path 
+  // to use the starting v.
+  sycl::buffer<int> winningAP{VertexSize};
   return 0;
 }

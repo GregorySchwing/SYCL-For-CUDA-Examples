@@ -35,10 +35,9 @@ void alternatingBFSTree(sycl::queue &q,
   constexpr const size_t SingletonSz = 1;
 
   const sycl::range Singleton{SingletonSz};
-  // Depth
-  sycl::buffer<int> depth{Singleton};
   // Expanded
   sycl::buffer<bool> expanded{Singleton};
+  sycl::buffer<bool> depth{Singleton};
 
 
   // Initialize input data
@@ -171,8 +170,7 @@ void alternatingBFSTree(sycl::queue &q,
                 sycl::buffer<int> &dist,
                 sycl::buffer<int> &pred,
                 sycl::buffer<int> &start,
-                sycl::buffer<int> &winningAP,
-                sycl::buffer<int> &requests,
+                sycl::buffer<int> &depth,
                 sycl::buffer<int> &degree,
                 sycl::buffer<int> &match,
                 const int vertexNum){
@@ -180,8 +178,7 @@ void alternatingBFSTree(sycl::queue &q,
   constexpr const size_t SingletonSz = 1;
 
   const sycl::range Singleton{SingletonSz};
-  // Depth
-  sycl::buffer<int> depth{Singleton};
+
   // Expanded
   sycl::buffer<bool> expanded{Singleton};
 
@@ -193,12 +190,10 @@ void alternatingBFSTree(sycl::queue &q,
     const auto read_write_t = sycl::access::mode::read_write;
     auto deg = degree.get_access<read_t>();
     auto m = match.get_access<read_t>();
-    auto r = requests.get_access<dwrite_t>();
 
     auto d = dist.get_access<dwrite_t>();    
     auto p = pred.get_access<dwrite_t>();
     auto s = start.get_access<dwrite_t>();
-    auto wAP = winningAP.get_access<dwrite_t>();
 
     auto dep = depth.get_access<dwrite_t>();
     auto exp = expanded.get_access<dwrite_t>();
@@ -210,9 +205,7 @@ void alternatingBFSTree(sycl::queue &q,
         d[i] = -1;
         s[i] = -1;
       }
-      r[i] = 0;
       p[i] = -1;
-      wAP[i] = -1;
     }
     dep[0] = 0;
     exp[0] = 0;
@@ -326,7 +319,40 @@ void alternatingBFSTree(sycl::queue &q,
   } while(flag);
 
 
+  {
+    const auto read_t = sycl::access::mode::read;
+    auto d = dist.get_access<read_t>();
+    auto s = start.get_access<read_t>();
+    auto dep = depth.get_access<read_t>();
 
+    std::cout << "Distance from start is : " << std::endl;
+    for (int depth_to_print = 0; depth_to_print <= dep[0]; depth_to_print++) {
+      for (int i = 0; i < vertexNum; i++) {
+        if (d[i] == depth_to_print) printf("vertex %d dist %d start %d\n",i, d[i], s[i]);
+      }
+    }
+    std::cout << std::endl;
+  }
+
+  return;
+}
+
+/*
+
+// Frontier level synchronization w pred
+void alternatingBFSTree(sycl::queue &q, 
+                sycl::buffer<unsigned int> &rows, 
+                sycl::buffer<unsigned int> &cols, 
+                sycl::buffer<int> &dist,
+                sycl::buffer<int> &pred,
+                sycl::buffer<int> &start,
+                sycl::buffer<int> &depth,
+                sycl::buffer<int> &winningAP,
+                sycl::buffer<int> &requests,
+                sycl::buffer<int> &degree,
+                sycl::buffer<int> &match,
+                const int vertexNum){
+  
   // To augment paths in parallel, the source vertex cannot be shared.
   // This uses races to set the winningAugmentingPath to be a the deepest
   // vertex in an M-alternating path of edge type B (case 1).
@@ -359,21 +385,5 @@ void alternatingBFSTree(sycl::queue &q,
       });
   };
   q.submit(cg4);
-
-  {
-    const auto read_t = sycl::access::mode::read;
-    auto d = dist.get_access<read_t>();
-    auto s = start.get_access<read_t>();
-    auto dep = depth.get_access<read_t>();
-
-    std::cout << "Distance from start is : " << std::endl;
-    for (int depth_to_print = 0; depth_to_print <= dep[0]; depth_to_print++) {
-      for (int i = 0; i < vertexNum; i++) {
-        if (d[i] == depth_to_print) printf("vertex %d dist %d start %d\n",i, d[i], s[i]);
-      }
-    }
-    std::cout << std::endl;
-  }
-
-  return;
 }
+*/
