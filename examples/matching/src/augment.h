@@ -17,7 +17,22 @@
 
 // Matching contains minimum vertex of matched pair.
 
-// Frontier level synchronization w pred
+// If we contract a blossom, we need to perform this whole algorithm again
+// starting with alternating BFS Tree.
+
+// If we only augment paths, I don't think we need another iteration.
+
+// Therefore, there are two kernels, augment_a which will only augment paths
+// Then if any start vertices remain, they must be blossom structures or unaugmentable.
+// If any blossoms are contracted in augment_b, reconstruct BFS.
+
+// do {
+//      BFS
+//      AuxMatch
+//      augment_a
+//      augment_b_returned_true = augment_b
+// } while(augment_b_returned_true)
+
 void augment_a(sycl::queue &q, 
                 sycl::buffer<unsigned int> &rows, 
                 sycl::buffer<unsigned int> &cols, 
