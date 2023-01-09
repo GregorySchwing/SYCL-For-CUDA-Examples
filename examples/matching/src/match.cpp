@@ -132,9 +132,10 @@ int main(int argc, char *argv[]) {
                   rows, 
                   cols, 
                   requests,
-                  auxMatch,
+                  match,
                   dist,
                   depth,
+                  auxMatch,
                   graph.vertexNum,
                   config.barrier);
 

@@ -630,7 +630,10 @@ void maximalMatching(sycl::queue &q,
     return;
 }
 
-// Frontier level synchronization w pred
+// To ensure no single vertx in an even level is used to form 
+// 2 or more augmenting paths in one iteration. 
+// Trivial augmenting paths are odd depth vertices unmatched in both matches.
+// Matches form either blossoms or augmenting paths (check start vertices)
 void maximalMatching(sycl::queue &q, 
                 sycl::buffer<unsigned int> &rows, 
                 sycl::buffer<unsigned int> &cols, 
@@ -638,6 +641,7 @@ void maximalMatching(sycl::queue &q,
                 sycl::buffer<int> &match,
                 sycl::buffer<int> &dist,
                 sycl::buffer<int> &depth,
+                sycl::buffer<int> &auxMatch,
                 const size_t vertexNum,
                 const unsigned int barrier = 0x88B81733){
 
@@ -659,7 +663,7 @@ void maximalMatching(sycl::queue &q,
         const auto read_t = sycl::access::mode::read;
         const auto dwrite_t = sycl::access::mode::discard_write;
         //auto deg = degree.get_access<read_t>();
-        auto m = match.get_access<dwrite_t>();
+        auto m = auxMatch.get_access<dwrite_t>();
         auto r = requests.get_access<dwrite_t>();
 
         auto sb = selectBarrier.get_access<dwrite_t>();
@@ -668,13 +672,13 @@ void maximalMatching(sycl::queue &q,
 
         auto depth_i = depth.get_access<read_t>();
         auto dist_i = dist.get_access<read_t>();
-        printf("matching inside even depths > 0\n");
+        printf("matching inside depths > 0\n");
         for (int i = 0; i < vertexNum; i++) {
-            // Only auxMatch in Even levels greater than 0.
-            if (dist_i[i] % 2 == 0 && dist_i[i]){
+            // Only auxMatch in even levels greater than 0.
+            if (dist_i[i] > 0 && dist_i[i] % 2 == 0){
                 m[i] = 0;
                 r[i] = 0;
-            }else {
+            } else {
                 m[i] = 2;
                 r[i] = vertexNum + 1;
             }
@@ -711,7 +715,7 @@ void maximalMatching(sycl::queue &q,
             auto aMD5K = MD5K.get_access<read_t>(h);
             auto aMD5R = MD5R.get_access<read_t>(h);
 
-            auto match_i = match.get_access<read_write_t>(h);
+            auto match_i = auxMatch.get_access<read_write_t>(h);
             auto km = keepMatching.get_access<write_t>(h);
             auto depth_i = depth.get_access<read_t>(h);
             auto dist_i = dist.get_access<read_t>(h);
@@ -763,7 +767,7 @@ void maximalMatching(sycl::queue &q,
 
         auto rows_i = rows.get_access<read_t>(h);
         auto cols_i = cols.get_access<read_t>(h);
-        auto match_i = match.get_access<read_t>(h);
+        auto match_i = auxMatch.get_access<read_t>(h);
         auto requests_i = requests.get_access<dwrite_t>(h);
         auto dist_i = dist.get_access<read_t>(h);
 
@@ -817,7 +821,7 @@ void maximalMatching(sycl::queue &q,
 
         auto rows_i = rows.get_access<read_t>(h);
         auto cols_i = cols.get_access<read_t>(h);
-        auto match_i = match.get_access<read_t>(h);
+        auto match_i = auxMatch.get_access<read_t>(h);
         auto requests_i = requests.get_access<read_write_t>(h);
         auto dist_i = dist.get_access<read_t>(h);
 
@@ -854,7 +858,7 @@ void maximalMatching(sycl::queue &q,
         const auto dwrite_t = sycl::access::mode::discard_write;
         const auto read_write_t = sycl::access::mode::read_write;
 
-        auto match_i = match.get_access<dwrite_t>(h);
+        auto match_i = auxMatch.get_access<write_t>(h);
         auto requests_i = requests.get_access<read_t>(h);
 
 
@@ -920,11 +924,41 @@ void maximalMatching(sycl::queue &q,
 
     } while(flag);
 
+    // Match odd level vertices - one workitem per workgroup
+    // Command Group creation
+    auto cg4 = [&](sycl::handler &h) {    
+    const auto read_t = sycl::access::mode::read;
+    const auto write_t = sycl::access::mode::write;
+    const auto read_write_t = sycl::access::mode::read_write;
+
+    auto match_i = match.get_access<read_t>(h);
+    auto auxMatch_i = auxMatch.get_access<write_t>(h);
+    auto dist_i = dist.get_access<read_t>(h);
+
+
+    h.parallel_for(VertexSize,
+                    [=](sycl::id<1> i) {                         
+                            if (dist_i[i] % 2 == 1 && 
+                                match_i[i] >= 4 && 
+                                i != match_i[i] && 
+                                dist_i[i] == dist_i[match_i[i]])
+                            {
+                                auto j = match_i[i];
+                                //Match the vertices if the request was mutual.
+                                // cant get this compile
+                                //  match_i[src] = 4 + min(src, r);
+                                auxMatch_i[i] = 4 + i;
+                                auxMatch_i[j] = 4 + i;
+                            }
+    });
+    };
+    q.submit(cg4);  
+
     {
         const auto read_t = sycl::access::mode::read;
         const auto read_write_t = sycl::access::mode::read_write;
 
-        auto m = match.get_access<read_t>();
+        auto m = auxMatch.get_access<read_t>();
         auto cs = colsum.get_access<read_write_t>();
 
         cs[0] = 0;
