@@ -36,6 +36,7 @@
 void augment_a(sycl::queue &q, 
                 sycl::buffer<unsigned int> &rows, 
                 sycl::buffer<unsigned int> &cols, 
+                sycl::buffer<int> &pred,
                 sycl::buffer<int> &dist,
                 sycl::buffer<int> &start,
                 sycl::buffer<int> &depth,
@@ -67,7 +68,56 @@ void augment_a(sycl::queue &q,
         }
     }
 
-    // The challenge is claiming up to two starting vertices per
+    // Can't figure out how to do parallel.  I could use a mutex.
+    {
+        const auto read_t = sycl::access::mode::read;
+        const auto write_t = sycl::access::mode::write;
+        const auto read_write_t = sycl::access::mode::read_write;
+
+        auto match_i = match.get_access<read_t>();
+        auto auxMatch_i = auxMatch.get_access<read_t>();
+        auto dist_i = dist.get_access<read_t>();
+        auto start_i = start.get_access<read_t>();
+        auto wAP_i = winningAugmentingPath.get_access<write_t>();
+        for (int i = 0; i < vertexNum; i++) {
+            if (wAP_i[start_i[i]] != -1)
+                continue;
+
+            // Case 1 : trivial augmenting path (end of tree (unmatched) 
+            // odd depth vertex.
+            if (dist_i[i] % 2 == 1 &&
+                match_i[i] < 4 &&
+                wAP_i[start_i[i]] == -1)
+            {
+                wAP_i[start_i[i]] = i;
+            // Odd level aug-path
+            // (start_i[i] != start_i[auxMatch_i[i]])
+            // prevents blossoms from claiming a stake
+            } else if (dist_i[i] % 2 == 1 &&
+                        match_i[i] >= 4 &&
+                        auxMatch_i[i] >= 4 &&
+                        start_i[i] != start_i[auxMatch_i[i]] &&
+                        wAP_i[start_i[i]] == -1 &&
+                        wAP_i[start_i[auxMatch_i[i]]] == -1){
+                wAP_i[start_i[i]] = i;
+                wAP_i[start_i[auxMatch_i[i]]] = auxMatch_i[i];
+            // Even level aug-path
+            // (start_i[i] != start_i[auxMatch_i[i]])
+            // prevents blossoms from claiming a stake
+            // i < match_i[i]  ensures only 1 vertex from
+            // the match tries to claim the SV.
+            } else if (dist_i[i] % 2 == 0 &&
+                        auxMatch_i[i] >= 4 &&
+                        start_i[i] != start_i[auxMatch_i[i]] &&
+                        wAP_i[start_i[i]] == -1 &&
+                        wAP_i[start_i[auxMatch_i[i]]] == -1){
+                wAP_i[start_i[i]] = i;
+                wAP_i[start_i[auxMatch_i[i]]] = auxMatch_i[i];
+            }
+        }
+    }
+
+    // The challenge is claiming up two starting vertices per
     // augmenting path and ensuring no two augmenting paths
     // claim common start vertices.
 
@@ -83,8 +133,10 @@ void augment_a(sycl::queue &q,
 
     // The paths are guarunteed disjoint by the definition of matching.
 
-    // Stake claim
+    // Stake claim / Push smaller of two matched vertices
     // Command Group creation
+
+    /*
     auto cg4 = [&](sycl::handler &h) {    
     const auto read_t = sycl::access::mode::read;
     const auto write_t = sycl::access::mode::write;
@@ -109,16 +161,18 @@ void augment_a(sycl::queue &q,
                             // prevents blossoms from claiming a stake
                             } else if (dist_i[i] % 2 == 1 &&
                                         match_i[i] >= 4 &&
-                                        match_i[i] != 4+i &&
+                                        i < match_i[i] &&
                                         auxMatch_i[i] >= 4 &&
                                         start_i[i] != start_i[auxMatch_i[i]]){
                                 wAP_i[start_i[i]] = i;
                             // Even level aug-path
                             // (start_i[i] != start_i[auxMatch_i[i]])
                             // prevents blossoms from claiming a stake
+                            // i < match_i[i]  ensures only 1 vertex from
+                            // the match tries to claim the SV.
                             } else if (dist_i[i] % 2 == 0 &&
                                         auxMatch_i[i] >= 4 &&
-                                        auxMatch_i[i] != 4+i &&
+                                        i < match_i[i] &&
                                         start_i[i] != start_i[auxMatch_i[i]]){
                                 wAP_i[start_i[i]] = i;
                             }
@@ -153,8 +207,45 @@ void augment_a(sycl::queue &q,
     };
     q.submit(cg5); 
 
-    // Augment paths
+    // Stake claim / Push smaller of two matched vertices
     // Command Group creation
+    auto cg5 = [&](sycl::handler &h) {    
+    const auto read_t = sycl::access::mode::read;
+    const auto write_t = sycl::access::mode::write;
+    const auto read_write_t = sycl::access::mode::read_write;
+
+    auto match_i = match.get_access<read_t>(h);
+    auto auxMatch_i = auxMatch.get_access<read_t>(h);
+    auto dist_i = dist.get_access<read_t>(h);
+    auto start_i = start.get_access<read_t>(h);
+    auto wAP_i = winningAugmentingPath.get_access<read_write_t>(h);
+
+    h.parallel_for(VertexSize,
+                    [=](sycl::id<1> i) {  
+                            if (dist_i[i] % 2 == 1 &&
+                                        match_i[i] >= 4 &&
+                                        i > match_i[i] &&
+                                        auxMatch_i[i] >= 4 &&
+                                        start_i[i] != start_i[auxMatch_i[i]] &&
+                                        wAP_i[start_i[auxMatch_i[i]]] == i){
+                                wAP_i[start_i[i]] = i;
+                            // Even level aug-path
+                            // (start_i[i] != start_i[auxMatch_i[i]])
+                            // prevents blossoms from claiming a stake
+                            // i < match_i[i]  ensures only 1 vertex from
+                            // the match tries to claim the SV.
+                            } else if (dist_i[i] % 2 == 0 &&
+                                        auxMatch_i[i] >= 4 &&
+                                        i > match_i[i] &&
+                                        start_i[i] != start_i[auxMatch_i[i]] &&
+                                        wAP_i[start_i[auxMatch_i[i]]] == i){
+                                wAP_i[start_i[i]] = i;
+                            }
+    });
+    };
+    q.submit(cg5);  
+
+    // Augment paths
     // Command Group creation
     auto cg6 = [&](sycl::handler &h) {    
     const auto read_t = sycl::access::mode::read;
@@ -183,6 +274,78 @@ void augment_a(sycl::queue &q,
     });
     };
     q.submit(cg6);  
+    */
+
+    // Can't figure out how to do parallel.  I could use a mutex.
+    {
+        const auto read_t = sycl::access::mode::read;
+        const auto write_t = sycl::access::mode::write;
+        const auto read_write_t = sycl::access::mode::read_write;
+        auto pred_i = pred.get_access<read_t>();
+        auto match_i = match.get_access<write_t>();
+        auto auxMatch_i = auxMatch.get_access<read_t>();
+        auto dist_i = dist.get_access<read_t>();
+        auto start_i = start.get_access<read_t>();
+        auto wAP_i = winningAugmentingPath.get_access<read_t>();
+        for (int i = 0; i < vertexNum; i++) {
+
+            // Case 1 : trivial augmenting path (end of tree (unmatched) 
+            // odd depth vertex.
+            if (dist_i[i] % 2 == 1 &&
+                match_i[i] < 4 &&
+                wAP_i[start_i[i]] == i)
+            {
+                auto current = i;
+                auto parent = pred_i[current];
+                for (int pathDepth = dist_i[i]; pathDepth > 0; --pathDepth){
+                    if (pathDepth % 2 == 1){
+                        match_i[current] = 4+parent;
+                        match_i[parent] = 4+current;
+                    }
+                    current = parent;
+                    parent = pred_i[current]; 
+                }
+            // Odd level aug-path
+            // (start_i[i] != start_i[auxMatch_i[i]])
+            // prevents blossoms from claiming a stake
+            } else if (dist_i[i] % 2 == 1 &&
+                        match_i[i] >= 4 &&
+                        auxMatch_i[i] >= 4 &&
+                        wAP_i[start_i[i]] == i &&
+                        wAP_i[start_i[auxMatch_i[i]]] == auxMatch_i[i]){
+                auto current = i;
+                auto parent = pred_i[current];
+                for (int pathDepth = dist_i[i]; pathDepth > 0; --pathDepth){
+                    if (pathDepth % 2 == 1){
+                        match_i[current] = 4+parent;
+                        match_i[parent] = 4+current;
+                    }
+                    current = parent;
+                    parent = pred_i[current]; 
+                }
+            // Even level aug-path
+            // (start_i[i] != start_i[auxMatch_i[i]])
+            // prevents blossoms from claiming a stake
+            // i < match_i[i]  ensures only 1 vertex from
+            // the match tries to claim the SV.
+            } else if (dist_i[i] % 2 == 0 &&
+                        auxMatch_i[i] >= 4 &&
+                        wAP_i[start_i[i]] == i &&
+                        wAP_i[start_i[auxMatch_i[i]]] == auxMatch_i[i]){
+                match_i[i] = 4+auxMatch_i[i];
+                auto current = i;
+                auto parent = pred_i[current];
+                for (int pathDepth = dist_i[i]; pathDepth > 0; --pathDepth){
+                    if (pathDepth % 2 == 0){
+                        match_i[current] = 4+parent;
+                        match_i[parent] = 4+current;
+                    }
+                    current = parent;
+                    parent = pred_i[current]; 
+                }
+            }
+        }
+    }
 
     sycl::buffer<int> checkMatch{VertexSize};
 
@@ -195,25 +358,41 @@ void augment_a(sycl::queue &q,
             cm_i[i] = 0;
         }
     }
-
+    constexpr const size_t TripletonSz = 3;
+    const sycl::range Tripleton{TripletonSz};
+    sycl::buffer<unsigned int> colsum {Tripleton};
+    bool validMatch = true;
     {
         const auto read_t = sycl::access::mode::read;
-        const auto write_t = sycl::access::mode::write;
         const auto read_write_t = sycl::access::mode::read_write;
 
-        auto match_i = match.get_access<read_t>();
+        auto m = match.get_access<read_t>();
+        auto cs = colsum.get_access<read_write_t>();
         auto cm_i = checkMatch.get_access<read_write_t>();
+        cs[0] = 0;
+        cs[1] = 0;
+        cs[2] = 0;
 
         for (int i = 0; i < vertexNum; i++) {
-            if(match_i[i] >= 4){
+            if(m[i] < 4)
+                ++cs[m[i]];
+            else if(m[i] >= 4)
                 ++cm_i[i];
-            }
         }
+        std::cout << "red count : " << cs[0] << std::endl;
+        std::cout << "blue count : " << cs[1] << std::endl;
+        std::cout << "dead count : " << cs[2] << std::endl;
+        std::cout << "new matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
         for (int i = 0; i < vertexNum; i++) {
             if(cm_i[i] > 1){
+                validMatch = false;
                 printf("Error %d is matched %d times\n", i, cm_i[i]);
             }
         }  
+
+    }
+    if(validMatch){
+        printf("Match 3 is valid\n");
     }
 
     return;

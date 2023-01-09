@@ -142,6 +142,7 @@ int main(int argc, char *argv[]) {
   augment_a(myQueue, 
             rows, 
             cols, 
+            pred,
             dist,
             start,
             depth,
