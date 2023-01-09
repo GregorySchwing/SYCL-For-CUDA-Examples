@@ -318,7 +318,6 @@ void alternatingBFSTree(sycl::queue &q,
     }
   } while(flag);
 
-
   {
     const auto read_t = sycl::access::mode::read;
     auto d = dist.get_access<read_t>();
@@ -330,6 +329,9 @@ void alternatingBFSTree(sycl::queue &q,
       for (int i = 0; i < vertexNum; i++) {
         if (d[i] == depth_to_print) printf("vertex %d dist %d start %d\n",i, d[i], s[i]);
       }
+    }
+    for (int i = 0; i < vertexNum; i++) {
+      if (d[i] > dep[0]) printf("Error: vertex %d dist %d start %d\n",i, d[i], s[i]);
     }
     std::cout << std::endl;
   }

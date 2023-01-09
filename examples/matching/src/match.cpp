@@ -142,10 +142,10 @@ int main(int argc, char *argv[]) {
   augment_a(myQueue, 
             rows, 
             cols, 
-            requests,
-            match,
             dist,
+            start,
             depth,
+            match,
             auxMatch,
             winningAugmentingPath,
             graph.vertexNum);
