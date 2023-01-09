@@ -670,13 +670,13 @@ void maximalMatching(sycl::queue &q,
         auto dist_i = dist.get_access<read_t>();
         printf("matching inside even depths > 0\n");
         for (int i = 0; i < vertexNum; i++) {
-            // Even levels greater than 0.
+            // Only auxMatch in Even levels greater than 0.
             if (dist_i[i] % 2 == 0 && dist_i[i]){
-                m[i] = 2;
-                r[i] = vertexNum + 1;
-            }else {
                 m[i] = 0;
                 r[i] = 0;
+            }else {
+                m[i] = 2;
+                r[i] = vertexNum + 1;
             }
         }
         sb[0] = barrier;
@@ -784,15 +784,15 @@ void maximalMatching(sycl::queue &q,
                                     //Use <2 in this if-conditon so odd levels can start dead.
                                     if (nm < 2 && dist_i[src]==dist_i[col])
                                     {
-                                    //Is this neighbour red?
-                                    if (nm == 1)
-                                    {
-                                        //Propose to this neighbour.
-                                        requests_i[src] = col;
-                                        return;
-                                    }
-                                    
-                                    dead = 0;
+                                        //Is this neighbour red?
+                                        if (nm == 1)
+                                        {
+                                            //Propose to this neighbour.
+                                            requests_i[src] = col;
+                                            return;
+                                        }
+                                        
+                                        dead = 0;
                                     }
                                 }
 

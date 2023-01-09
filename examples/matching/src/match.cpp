@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
                     graph.vertexNum);
   // To identify one and only one Augmenting path 
   // to use the starting v.
-  sycl::buffer<int> winningAP{VertexSize};
+  sycl::buffer<int> winningAugmentingPath{VertexSize};
   sycl::buffer<int> auxMatch{VertexSize};
 
   // Match inside even levels > 0 to avoid race conditions
@@ -137,6 +137,8 @@ int main(int argc, char *argv[]) {
                   depth,
                   graph.vertexNum,
                   config.barrier);
+
+  
 
   
   return 0;

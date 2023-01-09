@@ -1,7 +1,7 @@
 // Need to detect 3 cases (2 augments and 1 non-augmenting)
-// Case 1 : trivial augmenting path (even depth with no neighbors in my depth)
-// Case 2 : non-trivial augmenting path (even depth aux matched to a neighbor in my depth)
-// Case 3 : blossom 
+// Case 1 : trivial augmenting path (end of tree at even depth with no neighbors in my depth)
+// Case 2 : non-trivial augmenting path (end of tree at even depth aux matched to a neighbor in my depth)
+// Case 3 : blossom
 
 // Frontier level synchronization w pred
 void augment_a(sycl::queue &q, 
@@ -12,6 +12,7 @@ void augment_a(sycl::queue &q,
                 sycl::buffer<int> &depth,
                 sycl::buffer<int> &match,
                 sycl::buffer<int> &auxMatch,
+                sycl::buffer<int> &winningAugmentingPath,
                 const int vertexNum){
 
     constexpr const size_t SingletonSz = 1;
