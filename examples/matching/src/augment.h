@@ -108,52 +108,45 @@ void augment_a(sycl::queue &q,
 
 
     // Capture
-    // Match odd level vertices - one workitem per workgroup
     // Command Group creation
-    /*
-    auto cg4 = [&](sycl::handler &h) {    
+    auto cg5 = [&](sycl::handler &h) {    
     const auto read_t = sycl::access::mode::read;
     const auto write_t = sycl::access::mode::write;
     const auto read_write_t = sycl::access::mode::read_write;
 
     auto match_i = match.get_access<read_t>(h);
-    auto auxMatch_i = auxMatch.get_access<write_t>(h);
+    auto auxMatch_i = auxMatch.get_access<read_t>(h);
     auto dist_i = dist.get_access<read_t>(h);
+    auto start_i = start.get_access<read_t>(h);
+    auto wAP_i = winningAugmentingPath.get_access<write_t>(h);
 
     h.parallel_for(VertexSize,
                     [=](sycl::id<1> i) {  
-                            // An odd-level vertex matched to another odd-level vertex.                     
-                            if (dist_i[i] % 2 == 1 && 
-                                match_i[i] >= 4 && 
-                                i != match_i[i] && 
-                                dist_i[match_i[i]]  % 2 == 1)
-                            {
-                                auto j = match_i[i];
-                                //Match the vertices if the request was mutual.
-                                // cant get this compile
-                                //  match_i[src] = 4 + min(src, r);
-                                auxMatch_i[i] = 4 + i;
-                                auxMatch_i[j] = 4 + i;
+                            // I won this starting vertex.
+                            if (wAP_i[start_i[i]] == i && 
+                                auxMatch_i[i] >= 4 &&
+                                auxMatch_i[i] != 4+i){
+                                // I claim the other starting vertex.
+                                wAP_i[start_i[auxMatch_i[i]-4]] = auxMatch_i[i]-4;
                             }
     });
     };
-    q.submit(cg4);  
-    */
+    q.submit(cg5); 
 
     {
         const auto read_t = sycl::access::mode::read;
 
         auto wAP_i = winningAugmentingPath.get_access<read_t>();
         auto dist_i = dist.get_access<read_t>();
+        auto start_i = start.get_access<read_t>();
 
         for (int i = 0; i < vertexNum; i++) {
             if(wAP_i[i] > -1){
-                printf("%d %d\n",i,wAP_i[i]);
+                printf("%d start %d (%d) end %d (%d)\n",i,start_i[wAP_i[i]], dist_i[start_i[wAP_i[i]]], wAP_i[i], dist_i[wAP_i[i]]);
 
             }
-            if(wAP_i[i] > -1 && dist_i[wAP_i[i]] != 0){
+            if(wAP_i[i] > -1 && dist_i[start_i[wAP_i[i]]] != 0){
                 printf("Error %d %d %d\n",i,wAP_i[i], dist_i[wAP_i[i]]);
-                
             }
         }
     }
