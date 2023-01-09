@@ -133,22 +133,62 @@ void augment_a(sycl::queue &q,
     };
     q.submit(cg5); 
 
-    {
-        const auto read_t = sycl::access::mode::read;
+    // Augment paths/contract blossoms
+    // Command Group creation
+    auto cg6 = [&](sycl::handler &h) {    
+    const auto read_t = sycl::access::mode::read;
+    const auto write_t = sycl::access::mode::write;
+    const auto read_write_t = sycl::access::mode::read_write;
 
-        auto wAP_i = winningAugmentingPath.get_access<read_t>();
-        auto dist_i = dist.get_access<read_t>();
-        auto start_i = start.get_access<read_t>();
+    auto match_i = match.get_access<read_write_t>(h);
+    auto auxMatch_i = auxMatch.get_access<read_t>(h);
+    auto dist_i = dist.get_access<read_t>(h);
+    auto start_i = start.get_access<read_t>(h);
+    auto wAP_i = winningAugmentingPath.get_access<write_t>(h);
+
+    h.parallel_for(VertexSize,
+                    [=](sycl::id<1> i) {  
+                            // I won this starting vertex.
+                            if (wAP_i[start_i[i]] == i && 
+                                auxMatch_i[i] >= 4 &&
+                                auxMatch_i[i] != 4+i){
+                                // I claim the other starting vertex.
+                                wAP_i[start_i[auxMatch_i[i]-4]] = auxMatch_i[i]-4;
+                            }
+    });
+    };
+    q.submit(cg6); 
+
+    sycl::buffer<int> checkMatch{VertexSize};
+
+    {
+        const auto write_t = sycl::access::mode::write;
+
+        auto cm_i = checkMatch.get_access<write_t>();
 
         for (int i = 0; i < vertexNum; i++) {
-            if(wAP_i[i] > -1){
-                printf("%d start %d (%d) end %d (%d)\n",i,start_i[wAP_i[i]], dist_i[start_i[wAP_i[i]]], wAP_i[i], dist_i[wAP_i[i]]);
+            cm_i[i] = 0;
+        }
+    }
 
-            }
-            if(wAP_i[i] > -1 && dist_i[start_i[wAP_i[i]]] != 0){
-                printf("Error %d %d %d\n",i,wAP_i[i], dist_i[wAP_i[i]]);
+    {
+        const auto read_t = sycl::access::mode::read;
+        const auto write_t = sycl::access::mode::write;
+        const auto read_write_t = sycl::access::mode::read_write;
+
+        auto match_i = match.get_access<read_t>();
+        auto cm_i = checkMatch.get_access<read_write_t>();
+
+        for (int i = 0; i < vertexNum; i++) {
+            if(match_i[i] >= 4){
+                ++cm_i[i];
             }
         }
+        for (int i = 0; i < vertexNum; i++) {
+            if(cm_i[i] > 1){
+                printf("Error %d is matched %d times\n", i, cm_i[i]);
+            }
+        }  
     }
 
     return;

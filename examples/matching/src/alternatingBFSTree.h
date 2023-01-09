@@ -318,6 +318,7 @@ void alternatingBFSTree(sycl::queue &q,
     }
   } while(flag);
 
+  #ifdef NDEBUG
   {
     const auto read_t = sycl::access::mode::read;
     auto d = dist.get_access<read_t>();
@@ -335,7 +336,8 @@ void alternatingBFSTree(sycl::queue &q,
     }
     std::cout << std::endl;
   }
-
+  #endif
+  
   return;
 }
 
