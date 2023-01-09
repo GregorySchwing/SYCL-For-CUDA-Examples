@@ -104,17 +104,22 @@ void augment_a(sycl::queue &q,
                                 match_i[i] < 4)
                             {
                                 wAP_i[start_i[i]] = i;
-                            // Odd level aug-path/blossom
+                            // Odd level aug-path
+                            // (start_i[i] != start_i[auxMatch_i[i]])
+                            // prevents blossoms from claiming a stake
                             } else if (dist_i[i] % 2 == 1 &&
                                         match_i[i] >= 4 &&
                                         match_i[i] != 4+i &&
                                         auxMatch_i[i] >= 4 &&
-                                        auxMatch_i[i] != 4+i){
+                                        start_i[i] != start_i[auxMatch_i[i]]){
                                 wAP_i[start_i[i]] = i;
-                            // Even level aug-path/blossom
+                            // Even level aug-path
+                            // (start_i[i] != start_i[auxMatch_i[i]])
+                            // prevents blossoms from claiming a stake
                             } else if (dist_i[i] % 2 == 0 &&
                                         auxMatch_i[i] >= 4 &&
-                                        auxMatch_i[i] != 4+i){
+                                        auxMatch_i[i] != 4+i &&
+                                        start_i[i] != start_i[auxMatch_i[i]]){
                                 wAP_i[start_i[i]] = i;
                             }
     });
@@ -148,7 +153,8 @@ void augment_a(sycl::queue &q,
     };
     q.submit(cg5); 
 
-    // Augment paths/contract blossoms
+    // Augment paths
+    // Command Group creation
     // Command Group creation
     auto cg6 = [&](sycl::handler &h) {    
     const auto read_t = sycl::access::mode::read;
@@ -159,20 +165,24 @@ void augment_a(sycl::queue &q,
     auto auxMatch_i = auxMatch.get_access<read_t>(h);
     auto dist_i = dist.get_access<read_t>(h);
     auto start_i = start.get_access<read_t>(h);
-    auto wAP_i = winningAugmentingPath.get_access<write_t>(h);
+    auto wAP_i = winningAugmentingPath.get_access<read_t>(h);
 
     h.parallel_for(VertexSize,
                     [=](sycl::id<1> i) {  
-                            // I won this starting vertex.
-                            if (wAP_i[start_i[i]] == i && 
-                                auxMatch_i[i] >= 4 &&
-                                auxMatch_i[i] != 4+i){
-                                // I claim the other starting vertex.
-                                wAP_i[start_i[auxMatch_i[i]-4]] = auxMatch_i[i]-4;
+                            // Case 1 : trivial augmenting path (end of tree (unmatched) 
+                            // odd depth vertex.
+                            if (dist_i[i] % 2 == 1 &&
+                                match_i[i] < 4 &&
+                                wAP_i[start_i[i]] == i)
+                            {
+                               ;
+                            // Case 2 : Non-trivial augmenting path
+                            } else if (wAP_i[start_i[auxMatch_i[i]-4]] == auxMatch_i[i]-4 &&
+                                        wAP_i[start_i[auxMatch_i[i]-4]] == auxMatch_i[i]-4){
                             }
     });
     };
-    q.submit(cg6); 
+    q.submit(cg6);  
 
     sycl::buffer<int> checkMatch{VertexSize};
 

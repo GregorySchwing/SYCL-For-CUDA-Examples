@@ -107,24 +107,27 @@ void alternatingBFSTree(sycl::queue &q,
                         
                         // Not a frontier vertex
                         if (dist_i[src] != depth_i[0]) return;
-                        
-                        for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
-                          auto col = cols_i[col_index];
-                          // atomic isn't neccessary since I don't set predecessor.
-                          // even if I set predecessor, all races remain in the universe of
-                          // valid solutions.
-                          if (depth_i[0] % 2 == 0){
-                            if (dist_i[col] == -1){
-                              dist_i[col] = dist_i[src] + 1;
-                              expanded_i[0] = 1;
-                            }
-                          }else{
-                            if (dist_i[col] == -1 && (match_i[src] == match_i[col])){
-                              dist_i[col] = dist_i[src] + 1;
-                              expanded_i[0] = 1;
-                            }
+                        if (depth_i[0] % 2 == 0){
+                          for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
+                            auto col = cols_i[col_index];
+                            // atomic isn't neccessary since I don't set predecessor.
+                            // even if I set predecessor, all races remain in the universe of
+                            // valid solutions.
+                              if (dist_i[col] == -1){
+                                dist_i[col] = dist_i[src] + 1;
+                                expanded_i[0] = 1;
+                              }
                           }
-                        }                     
+                        } else {
+                          auto col = match_i[src];  
+                          // If this edge is matched, I know the next vertex already
+                          if (dist_i[col] == -1 && 4 <= col){
+                              //if (dist_i[col] == -1 && (match_i[src] == match_i[col])){
+                              dist_i[col] = dist_i[src] + 1;
+                              expanded_i[0] = 1;
+                          }
+                        }
+                     
       });
     };
     q.submit(cg);
@@ -287,26 +290,28 @@ void alternatingBFSTree(sycl::queue &q,
                         
                         // Not a frontier vertex
                         if (dist_i[src] != depth_i[0]) return;
-                        
-                        for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
-                          auto col = cols_i[col_index];
-                          // atomic isn't neccessary since I don't set predecessor.
-                          // even if I set predecessor, all races remain in the universe of
-                          // valid solutions.
-                          if (depth_i[0] % 2 == 0){
-                            if (dist_i[col] == -1){
-                              dist_i[col] = dist_i[src] + 1;
-                              pred_i[col] = src;
-                              expanded_i[0] = 1;
-                            }
-                          }else{
-                            if (dist_i[col] == -1 && (match_i[src] == match_i[col])){
-                              dist_i[col] = dist_i[src] + 1;
-                              pred_i[col] = src;
-                              expanded_i[0] = 1;
-                            }
+                        if (depth_i[0] % 2 == 0){
+                          for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
+                            auto col = cols_i[col_index];
+                            // atomic isn't neccessary since I don't set predecessor.
+                            // even if I set predecessor, all races remain in the universe of
+                            // valid solutions.
+                              if (dist_i[col] == -1){
+                                dist_i[col] = dist_i[src] + 1;
+                                pred_i[col] = src;
+                                expanded_i[0] = 1;
+                              }
                           }
-                        }                     
+                        } else {
+                          auto col = match_i[src];  
+                          // If this edge is matched, I know the next vertex already
+                          if (dist_i[col] == -1 && 4 <= col){
+                              //if (dist_i[col] == -1 && (match_i[src] == match_i[col])){
+                              dist_i[col] = dist_i[src] + 1;
+                              pred_i[col] = src;
+                              expanded_i[0] = 1;
+                          }
+                        }       
       });
     };
     q.submit(cg2);
@@ -337,7 +342,7 @@ void alternatingBFSTree(sycl::queue &q,
     std::cout << std::endl;
   }
   #endif
-  
+
   return;
 }
 

@@ -260,9 +260,11 @@ void maximalMatching(sycl::queue &q,
                                 //Match the vertices if the request was mutual.
                                 // cant get this compile
                                 //  match_i[src] = 4 + min(src, r);
-                                if (src < r)
-                                match_i[src] = 4 + src;
-                                else 
+                                //if (src < r)
+                                //match_i[src] = 4 + src;
+                                //else 
+                                //match_i[src] = 4 + r;
+                                // This way the matched vertices point to each other.
                                 match_i[src] = 4 + r;
                             }
                             }            
@@ -894,22 +896,25 @@ void maximalMatching(sycl::queue &q,
                             //Only unmatched vertices make requests.
                             if (r == vertexNum + 1)
                             {
-                            //This is vertex without any available neighbours, discard it.
-                            match_i[src] = 2;
+                                //This is vertex without any available neighbours, discard it.
+                                match_i[src] = 2;
                             }
                             else if (r < vertexNum)
                             {
-                            //This vertex has made a valid request.
-                            if (requests_i[r] == src)
-                            {
-                                //Match the vertices if the request was mutual.
-                                // cant get this compile
-                                //  match_i[src] = 4 + min(src, r);
-                                if (src < r)
-                                match_i[src] = 4 + src;
-                                else 
-                                match_i[src] = 4 + r;
-                            }
+                                //This vertex has made a valid request.
+                                if (requests_i[r] == src)
+                                {
+                                    //Match the vertices if the request was mutual.
+                                    // cant get this compile
+                                    //  match_i[src] = 4 + min(src, r);
+                                    //if (src < r)
+                                    //match_i[src] = 4 + src;
+                                    //else 
+                                    //match_i[src] = 4 + r;
+                                    // This way the matched vertices point to each other.
+                                    match_i[src] = 4 + r;
+
+                                }
                             }            
         });
         };
@@ -965,15 +970,12 @@ void maximalMatching(sycl::queue &q,
                             // An odd-level vertex matched to another odd-level vertex.                     
                             if (dist_i[i] % 2 == 1 && 
                                 match_i[i] >= 4 && 
-                                i != match_i[i] && 
                                 dist_i[match_i[i]]  % 2 == 1)
                             {
-                                auto j = match_i[i];
                                 //Match the vertices if the request was mutual.
                                 // cant get this compile
                                 //  match_i[src] = 4 + min(src, r);
-                                auxMatch_i[i] = 4 + i;
-                                auxMatch_i[j] = 4 + i;
+                                auxMatch_i[i] = match_i[i];
                             }
     });
     };
