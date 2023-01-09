@@ -39,54 +39,123 @@ void augment_a(sycl::queue &q,
     const size_t numBlocks = vertexNum;
     const sycl::range VertexSize{numBlocks};
 
+
+    // Initialize input data
+    {
+        const auto read_t = sycl::access::mode::read;
+        const auto dwrite_t = sycl::access::mode::discard_write;
+        //auto deg = degree.get_access<read_t>();
+        auto wAP_i = winningAugmentingPath.get_access<dwrite_t>();
+
+        for (int i = 0; i < vertexNum; i++) {
+            wAP_i[i] = -1;
+        }
+    }
+
+    // The challenge is claiming up to two starting vertices per
+    // augmenting path and ensuring no two augmenting paths
+    // claim common start vertices.
+
+    // This is done in two phases (stake and capture)
+    // Stake claims the starting vertex of the smaller
+    // of the two matched vertices in the secondary match.
+
+    // Capture claims the larger if the smaller's stake was successful.
+
+    // Since only successful stakes capture the second vertex,
+    // the final value written to capture is ensured to be a valid
+    // augmenting path.
+
+    // The paths are guarunteed disjoint by the definition of matching.
+
+    // Stake claim
+    // Command Group creation
+    auto cg4 = [&](sycl::handler &h) {    
     const auto read_t = sycl::access::mode::read;
-    auto d = depth.get_access<read_t>();
-    for (int level = 1; level <= d[0]; ++level){
-    //for (int level = d[0]; level >= 0; --level){
+    const auto write_t = sycl::access::mode::write;
+    const auto read_write_t = sycl::access::mode::read_write;
 
-        // Necessary to avoid atomics in setting pred/dist/start
-        // Conflicts could come from setting pred and start non-atomically.
-        // (Push phase) As dist is race-proof, only set pred in the frontier expansion 
-        // (Pull phase) pull start into new frontier.
-        // Command Group creation
-        auto cg3 = [&](sycl::handler &h) {    
-            const auto read_t = sycl::access::mode::read;
-            const auto write_t = sycl::access::mode::write;
-            const auto read_write_t = sycl::access::mode::read_write;
+    auto match_i = match.get_access<read_t>(h);
+    auto auxMatch_i = auxMatch.get_access<read_t>(h);
+    auto dist_i = dist.get_access<read_t>(h);
+    auto start_i = start.get_access<read_t>(h);
+    auto wAP_i = winningAugmentingPath.get_access<write_t>(h);
 
-            auto depth_i = depth.get_access<read_t>(h);
-            auto dist_i = dist.get_access<read_t>(h);
-            auto auxM_i = auxMatch.get_access<read_write_t>(h);
+    h.parallel_for(VertexSize,
+                    [=](sycl::id<1> i) {  
+                            // Case 1 : trivial augmenting path (end of tree (unmatched) 
+                            // odd depth vertex.
+                            if (dist_i[i] % 2 == 1 &&
+                                match_i[i] < 4)
+                            {
+                                wAP_i[start_i[i]] = i;
+                            // Odd level aug-path/blossom
+                            } else if (dist_i[i] % 2 == 1 &&
+                                        match_i[i] >= 4 &&
+                                        match_i[i] != 4+i &&
+                                        auxMatch_i[i] >= 4 &&
+                                        auxMatch_i[i] != 4+i){
+                                wAP_i[start_i[i]] = i;
+                            // Even level aug-path/blossom
+                            } else if (dist_i[i] % 2 == 0 &&
+                                        auxMatch_i[i] >= 4 &&
+                                        auxMatch_i[i] != 4+i){
+                                wAP_i[start_i[i]] = i;
+                            }
+    });
+    };
+    q.submit(cg4);  
 
-            auto start_i = start.get_access<read_t>(h);
-            auto wAP_i = winningAugmentingPath.get_access<write_t>(h);
 
-            h.parallel_for(VertexSize,
-                            [=](sycl::id<1> i) { 
-                if(dist_i[i] % 2 == 1 && auxM_i[i] >= 4){
-                    
-                } 
-                //&& auxM_i[start_i[i]] == start_i[i]){ 
-                //    start_i[i] = start_i[i];
-                //}
-            });
-        };
-        q.submit(cg3);
-    } 
+    // Capture
+    // Match odd level vertices - one workitem per workgroup
+    // Command Group creation
+    /*
+    auto cg4 = [&](sycl::handler &h) {    
+    const auto read_t = sycl::access::mode::read;
+    const auto write_t = sycl::access::mode::write;
+    const auto read_write_t = sycl::access::mode::read_write;
+
+    auto match_i = match.get_access<read_t>(h);
+    auto auxMatch_i = auxMatch.get_access<write_t>(h);
+    auto dist_i = dist.get_access<read_t>(h);
+
+    h.parallel_for(VertexSize,
+                    [=](sycl::id<1> i) {  
+                            // An odd-level vertex matched to another odd-level vertex.                     
+                            if (dist_i[i] % 2 == 1 && 
+                                match_i[i] >= 4 && 
+                                i != match_i[i] && 
+                                dist_i[match_i[i]]  % 2 == 1)
+                            {
+                                auto j = match_i[i];
+                                //Match the vertices if the request was mutual.
+                                // cant get this compile
+                                //  match_i[src] = 4 + min(src, r);
+                                auxMatch_i[i] = 4 + i;
+                                auxMatch_i[j] = 4 + i;
+                            }
+    });
+    };
+    q.submit(cg4);  
+    */
 
     {
         const auto read_t = sycl::access::mode::read;
-        auto d = dist.get_access<read_t>();
-        auto s = start.get_access<read_t>();
-        auto dep = depth.get_access<read_t>();
 
-        std::cout << "Distance from start is : " << std::endl;
-        for (int depth_to_print = 0; depth_to_print <= dep[0]; depth_to_print++) {
-            for (int i = 0; i < vertexNum; i++) {
-                if (d[i] == depth_to_print) printf("vertex %d dist %d start %d\n",i, d[i], s[i]);
+        auto wAP_i = winningAugmentingPath.get_access<read_t>();
+        auto dist_i = dist.get_access<read_t>();
+
+        for (int i = 0; i < vertexNum; i++) {
+            if(wAP_i[i] > -1){
+                printf("%d %d\n",i,wAP_i[i]);
+
+            }
+            if(wAP_i[i] > -1 && dist_i[wAP_i[i]] != 0){
+                printf("Error %d %d %d\n",i,wAP_i[i], dist_i[wAP_i[i]]);
+                
             }
         }
-        std::cout << std::endl;
     }
 
     return;

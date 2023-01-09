@@ -139,7 +139,16 @@ int main(int argc, char *argv[]) {
                   graph.vertexNum,
                   config.barrier);
 
-  
+  augment_a(myQueue, 
+            rows, 
+            cols, 
+            requests,
+            match,
+            dist,
+            depth,
+            auxMatch,
+            winningAugmentingPath,
+            graph.vertexNum);
 
   
   return 0;
