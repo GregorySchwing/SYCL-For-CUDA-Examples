@@ -937,11 +937,12 @@ void maximalMatching(sycl::queue &q,
 
 
     h.parallel_for(VertexSize,
-                    [=](sycl::id<1> i) {                         
+                    [=](sycl::id<1> i) {  
+                            // An odd-level vertex matched to another odd-level vertex.                     
                             if (dist_i[i] % 2 == 1 && 
                                 match_i[i] >= 4 && 
                                 i != match_i[i] && 
-                                dist_i[i] == dist_i[match_i[i]])
+                                dist_i[match_i[i]]  % 2 == 1)
                             {
                                 auto j = match_i[i];
                                 //Match the vertices if the request was mutual.
