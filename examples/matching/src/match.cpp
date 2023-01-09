@@ -117,11 +117,14 @@ int main(int argc, char *argv[]) {
                     degree,
                     match,
                     graph.vertexNum);
+
+  
   // To identify one and only one Augmenting path 
   // to use the starting v.
   sycl::buffer<int> winningAugmentingPath{VertexSize};
   sycl::buffer<int> auxMatch{VertexSize};
 
+  /*
   // Match inside even levels > 0 to avoid race conditions
   // in blossoms/augmenting paths.  For example consider a 
   // cycle represented by a circular linked list of odd length n.
@@ -150,7 +153,7 @@ int main(int argc, char *argv[]) {
             auxMatch,
             winningAugmentingPath,
             graph.vertexNum);
-
+  */
   
   return 0;
 }
