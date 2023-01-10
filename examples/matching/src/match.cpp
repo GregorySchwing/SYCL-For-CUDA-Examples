@@ -26,6 +26,7 @@
 #include "auxFunctions.h"
 #include "alternatingBFSTree.h"
 #include "match.h"
+#include "ssMatch.h"
 #include "augment.h"
 
 #include <CL/sycl.hpp>
@@ -124,7 +125,6 @@ int main(int argc, char *argv[]) {
   sycl::buffer<int> winningAugmentingPath{VertexSize};
   sycl::buffer<int> auxMatch{VertexSize};
 
-  /*
   // Match inside even levels > 0 to avoid race conditions
   // in blossoms/augmenting paths.  For example consider a 
   // cycle represented by a circular linked list of odd length n.
@@ -153,6 +153,12 @@ int main(int argc, char *argv[]) {
             auxMatch,
             winningAugmentingPath,
             graph.vertexNum);
+  
+  /*
+  int matchc =  edmonds(myQueue, 
+                      rows, 
+                      cols, 
+                      vertexNum);
   */
   
   return 0;
