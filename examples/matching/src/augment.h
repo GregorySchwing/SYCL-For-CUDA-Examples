@@ -33,6 +33,10 @@
 //      augment_b_returned_true = augment_b
 // } while(augment_b_returned_true)
 
+
+#ifndef AUGMENT_h
+#define AUGMENT_h
+
 void augment_a(sycl::queue &q, 
                 sycl::buffer<unsigned int> &rows, 
                 sycl::buffer<unsigned int> &cols, 
@@ -397,3 +401,5 @@ void augment_a(sycl::queue &q,
 
     return;
 }
+
+#endif

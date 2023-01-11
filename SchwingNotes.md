@@ -1,5 +1,7 @@
 To run with the minimum setup required:
 
+Will only run on the CPU.
+
 Prerequisite:
 
 DPC++ compiler
@@ -11,4 +13,7 @@ Install
 source /opt/intel/oneapi/setvars.sh
 
 compile with
+dpcpp -o a.out src/*.cpp
+
+i.e.
 dpcpp -o a.out vector_addition.cpp

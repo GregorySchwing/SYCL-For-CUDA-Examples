@@ -18,6 +18,9 @@
  * @File: vector_addition.cpp
  */
 
+#ifndef ALTERNATINGBFSTREE_H
+#define ALTERNATINGBFSTREE_H
+
 #include <algorithm>
 #include <iostream>
 #include <vector>
@@ -396,3 +399,5 @@ void alternatingBFSTree(sycl::queue &q,
   q.submit(cg4);
 }
 */
+
+#endif

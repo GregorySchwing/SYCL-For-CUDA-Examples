@@ -26,7 +26,7 @@
 #include "auxFunctions.h"
 #include "alternatingBFSTree.h"
 #include "match.h"
-#include "ssMatch.h"
+//#include "ssMatch.h"
 #include "augment.h"
 
 #include <CL/sycl.hpp>
@@ -74,7 +74,11 @@ int main(int argc, char *argv[]) {
       return -1;
     }
   };
-  sycl::queue myQueue{CUDASelector};
+  //sycl::queue myQueue{CUDASelector};
+  sycl::queue myQueue{};
+  std::cout << "Running on "
+      << myQueue.get_device().get_info<sycl::info::device::name>()
+      << "\n";
   //sycl::queue myQueue{cl::sycl::host_selector()};
   std::cout << "Selected device : " <<
   myQueue.get_device().get_info<sycl::info::device::name>() << "\n";

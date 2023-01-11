@@ -52,8 +52,11 @@ int main(int argc, char *argv[]) {
       return -1;
     }
   };
-  sycl::queue myQueue{CUDASelector};
-
+  //sycl::queue myQueue{CUDASelector};
+  sycl::queue myQueue{};
+  std::cout << "Running on "
+        << myQueue.get_device().get_info<sycl::info::device::name>()
+        << "\n";
   // Command Group creation
   auto cg = [&](sycl::handler &h) {
     const auto read_t = sycl::access::mode::read;
