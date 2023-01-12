@@ -75,7 +75,7 @@ void alternatingBFSTree(sycl::queue &q,
   sycl::nd_range<1> test{NumWorkItems, WorkGroupSize};
 
 
-  printf("get_local_range %lu get_global_range %lu get_group_range %lu \n", test.get_local_range()[0],  test.get_global_range()[0],  test.get_group_range()[0]);
+  //printf("get_local_range %lu get_global_range %lu get_group_range %lu \n", test.get_local_range()[0],  test.get_global_range()[0],  test.get_group_range()[0]);
 
   bool flag = false;
   do{
@@ -227,7 +227,7 @@ void alternatingBFSTree(sycl::queue &q,
   sycl::nd_range<1> test{NumWorkItems, WorkGroupSize};
 
 
-  printf("get_local_range %lu get_global_range %lu get_group_range %lu \n", test.get_local_range()[0],  test.get_global_range()[0],  test.get_group_range()[0]);
+  //printf("get_local_range %lu get_global_range %lu get_group_range %lu \n", test.get_local_range()[0],  test.get_global_range()[0],  test.get_group_range()[0]);
 
   bool flag = false;
   do{
