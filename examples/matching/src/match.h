@@ -331,13 +331,12 @@ void maximalMatching(sycl::queue &q,
 }
 
 // NDItem version
-void maximalMatching(sycl::queue &q, 
+void maximalMatchingNDItem(sycl::queue &q, 
                 int &syclinitmatchc,
                 sycl::buffer<unsigned int> &rows, 
                 sycl::buffer<unsigned int> &cols, 
                 sycl::buffer<int> &requests,
                 sycl::buffer<int> &match,
-                sycl::buffer<int> &depth,
                 const size_t vertexNum,
                 const unsigned int barrier = 0x88B81733){
 

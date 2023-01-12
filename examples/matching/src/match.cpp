@@ -28,6 +28,7 @@
 #include "match.h"
 #include "edmondsSerial.h"
 #include "augment.h"
+#include "atomicAugment.h"
 
 #include <CL/sycl.hpp>
 // For min(T a, T b)
@@ -123,13 +124,12 @@ int main(int argc, char *argv[]) {
   chrono::time_point<std::chrono::system_clock> nd_item_initial_match_begin, nd_item_initial_match_end;
   nd_item_initial_match_begin = std::chrono::system_clock::now(); 
   int nditem_syclinitmatchc;
-  maximalMatching(myQueue, 
+  maximalMatchingNDItem(myQueue, 
                 nditem_syclinitmatchc,
                 rows, 
                 cols, 
                 requests,
                 match,
-                depth,
                 graph.vertexNum,
                 config.barrier);
   nd_item_initial_match_end = std::chrono::system_clock::now(); 
