@@ -26,7 +26,7 @@
 #include "auxFunctions.h"
 #include "alternatingBFSTree.h"
 #include "match.h"
-//#include "ssMatch.h"
+#include "edmondsSerial.h"
 #include "augment.h"
 
 #include <CL/sycl.hpp>
@@ -94,6 +94,9 @@ int main(int argc, char *argv[]) {
   printf("get_local_range %lu get_global_range %lu get_group_range %lu \n", test.get_local_range()[0],  test.get_global_range()[0],  test.get_group_range()[0]);
 
   //maximalMatching();
+  // This kernel is fine as is for use in a search tree. 
+  // Each subkernel should be logically kernelized by available
+  // resources.
   maximalMatching(myQueue, 
                 rows, 
                 cols, 
@@ -101,17 +104,26 @@ int main(int argc, char *argv[]) {
                 match,
                 graph.vertexNum,
                 config.barrier);
-  // Initialize input data
+  // These arrays are uncompromising.
   sycl::buffer<int> dist{VertexSize};
-  // For bt'ing.
+  sycl::buffer<int> blossom{VertexSize};
+
+  // For bt'ing. This array is uncompromising.
+  // it is neccessary to get the starting vertex
+  // which is required for detecting blossoms.
   sycl::buffer<int> pred{VertexSize};
+
   // To identify the source of the disjoint alt-tree
   // in the forest.  This is necessary to ensure, two
-  // augmenting paths/blossoms don't share a start.
+  // augmenting paths don't share a start -> blossom
+  // This isn't strictly neccessary since we can bt.
   sycl::buffer<int> start{VertexSize};
 
   sycl::buffer<int> depth{Singleton};
 
+  // This kernel is fine as is for use in a search tree. 
+  // Each subkernel should be logically kernelized by available
+  // resources.
   alternatingBFSTree(myQueue, 
                     rows, 
                     cols, 
@@ -126,6 +138,9 @@ int main(int argc, char *argv[]) {
   
   // To identify one and only one Augmenting path 
   // to use the starting v.
+  // Both of these are only neccessary in the data-parallel
+  // version.  If a single work-group performs the matching,
+  // these can be eliminated by work item synchronization.
   sycl::buffer<int> winningAugmentingPath{VertexSize};
   sycl::buffer<int> auxMatch{VertexSize};
 
@@ -135,6 +150,8 @@ int main(int argc, char *argv[]) {
   // If each vertex in the level tried creating an augmenting path 
   // with its rightside vertex, the entire level would augment, 
   // but at (2/3)n can be in an forest of disjoint augmenting paths.
+
+  // This kernel should be modified for use in a search tree.
   maximalMatching(myQueue, 
                   rows, 
                   cols, 
@@ -164,6 +181,55 @@ int main(int argc, char *argv[]) {
                       cols, 
                       vertexNum);
   */
+
+  // detect and shrink blossoms
+  // If there is no stem, s.t. r = start
+  // then no matching is of this blossom
+  // is possible even after contraction.
+
+  // After contraction, reperform bfs
+  // If (B,k) is matched in an augmenting path
+  // replace (B,k) with (r,k)
+  // Replace the unmatched edge (B,j) with the
+  // edge (i,j) from which (B,j) originated,
+  // followed by the even alt path in B from
+  // i to r. If i was an S-vertex when B was formed
+  // we use the labels to backtrack from i to r.
+  // Otherwise, we use the labels in reverse order
+  // around the blossom.
+
+  // Storing B as a doubly linked list with a 
+  // marked base makes this easy.
+
+  // I have two options
+  //  1)Perform another BFS after blossom contraction
+  //  - This will mean I'll need an int array for blossom membership
+  //    It may be important for recursive blossom creation/destruction
+  //    to differentiate Blossoms with an int key.
+  //    If the next BFS iteration passes through a blossom, special conditions
+  //    should be used for passing through the blossom.
+  //    No edges where both (i,j) are both in the blossom should
+  //    be traversed unless (i,j) were within the original blossom.
+  //    Therefore, I'll need the doubly linked list structure (rooted at r?) to
+  //    subset the edges amongst the blossom.
+  //    Alternatively, if the edges are given values, the non-eligible
+  //    edges can be deactivated.
+  //  2)Immediately process all blossom paths without contraction.
+  //    This means considering all eligible outgoing blossom edges for alt-M
+  //    augmenting from the vertex which happened upon a blossom.
+  //    Such a lazy blossom contraction loses the guaruntees of upper
+  //    bounds on a cycle length, and thus should be avoided.
+  //    Unless you can prove that an augmenting path will only
+  //    pass through the first blossom stumbled upon.
+
+
+
+  //augment_b
   
+  // Test matching against serial edmonds
+  EdmondsSerial e(graph);
+  int matchc = e.edmonds();
+  // matchc is number of matched edges
+  printf("Serial max matching count : %d\n", 2*matchc);
   return 0;
 }
