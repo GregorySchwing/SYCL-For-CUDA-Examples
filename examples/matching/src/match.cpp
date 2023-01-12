@@ -59,6 +59,7 @@ int main(int argc, char *argv[]) {
   sycl::buffer<unsigned int> rows{graph.srcPtr, RowSize};
   sycl::buffer<unsigned int> cols{graph.dst, ColSize};
   sycl::buffer<int> degree{graph.degree, VertexSize};
+  sycl::buffer<int> depth{Singleton};
 
 
   // Device output vector
@@ -119,6 +120,24 @@ int main(int argc, char *argv[]) {
   printf("\nElapsed Time for SYCL Initial Max Match: %f\n",elapsed_seconds_max.count());
   printf("SYCL initial match count is: %u\n", syclinitmatchc);
 
+  chrono::time_point<std::chrono::system_clock> nd_item_initial_match_begin, nd_item_initial_match_end;
+  nd_item_initial_match_begin = std::chrono::system_clock::now(); 
+  int nditem_syclinitmatchc;
+  maximalMatching(myQueue, 
+                nditem_syclinitmatchc,
+                rows, 
+                cols, 
+                requests,
+                match,
+                depth,
+                graph.vertexNum,
+                config.barrier);
+  nd_item_initial_match_end = std::chrono::system_clock::now(); 
+	elapsed_seconds_max = nd_item_initial_match_end - nd_item_initial_match_begin; 
+
+  printf("\nElapsed Time for SYCL NDItem Initial Max Match: %f\n",elapsed_seconds_max.count());
+  printf("SYCL initial match count is: %u\n", syclinitmatchc);
+
   // These arrays are uncompromising.
   sycl::buffer<int> dist{VertexSize};
   // when a BFS round comes upon a blossom
@@ -139,7 +158,6 @@ int main(int argc, char *argv[]) {
   // This isn't strictly neccessary since we can bt.
   sycl::buffer<int> start{VertexSize};
 
-  sycl::buffer<int> depth{Singleton};
 
   // This kernel is fine as is for use in a search tree. 
   // Each subkernel should be logically kernelized by available

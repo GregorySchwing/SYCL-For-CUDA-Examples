@@ -384,16 +384,18 @@ void augment_a(sycl::queue &q,
             else if(m[i] >= 4)
                 ++cm_i[i];
         }
+        #ifdef NDEBUG
         std::cout << "red count : " << cs[0] << std::endl;
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
-        std::cout << "new matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
+        std::cout << "matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
         for (int i = 0; i < vertexNum; i++) {
             if(cm_i[i] > 1){
                 validMatch = false;
                 printf("Error %d is matched %d times\n", i, cm_i[i]);
             }
         }  
+        #endif
         matchCount = vertexNum-(cs[0]+cs[1]+cs[2]);
     }
     if(validMatch){

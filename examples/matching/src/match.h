@@ -337,6 +337,7 @@ void maximalMatching(sycl::queue &q,
             else if(m[i] >= 4)
                 ++cm_i[i];
         }
+        #ifdef NDEBUG
         std::cout << "red count : " << cs[0] << std::endl;
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
@@ -347,6 +348,7 @@ void maximalMatching(sycl::queue &q,
                 printf("Error %d is matched %d times\n", i, cm_i[i]);
             }
         }  
+        #endif
         syclinitmatchc = vertexNum-(cs[0]+cs[1]+cs[2]);
 
     }
@@ -356,8 +358,9 @@ void maximalMatching(sycl::queue &q,
     return;
 }
 
-// Frontier level synchronization w pred
+// NDItem version
 void maximalMatching(sycl::queue &q, 
+                int &syclinitmatchc,
                 sycl::buffer<unsigned int> &rows, 
                 sycl::buffer<unsigned int> &cols, 
                 sycl::buffer<int> &requests,
@@ -379,6 +382,14 @@ void maximalMatching(sycl::queue &q,
   sycl::buffer<bool> keepMatching{Singleton};
   sycl::buffer<unsigned int> colsum {Tripleton};
 
+  const size_t numBlocks = vertexNum;
+
+  const size_t threadsPerBlock = 32;
+  const size_t totalThreads = numBlocks * threadsPerBlock;
+
+  const sycl::range NumWorkItems{totalThreads};
+  const sycl::range WorkGroupSize{threadsPerBlock};
+
   // Initialize input data
   {
     const auto read_t = sycl::access::mode::read;
@@ -386,7 +397,6 @@ void maximalMatching(sycl::queue &q,
     //auto deg = degree.get_access<read_t>();
     auto m = match.get_access<dwrite_t>();
     auto r = requests.get_access<dwrite_t>();
-    auto d = depth.get_access<dwrite_t>();
 
     auto sb = selectBarrier.get_access<dwrite_t>();
     auto km = keepMatching.get_access<dwrite_t>();
@@ -401,7 +411,6 @@ void maximalMatching(sycl::queue &q,
     cs[0] = 0;
     cs[1] = 0;
     cs[2] = 0;
-    d[0] = 0;
 
     std::cout << "selectBarrier " << sb[0] << std::endl;
   }
@@ -482,15 +491,25 @@ void maximalMatching(sycl::queue &q,
         auto match_i = match.get_access<read_t>(h);
         auto requests_i = requests.get_access<dwrite_t>(h);
 
-
-        h.parallel_for(VertexSize,
-                        [=](sycl::id<1> src) {                         
+        h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
+        //h.parallel_for(VertexSize,[=](sycl::id<1> src) {                         
                             //Look at all blue vertices and let them make requests.
+                            sycl::group<1> gr = item.get_group();
+                            sycl::range<1> ra = gr.get_local_range();
+                            size_t src = gr.get_group_linear_id();
+                            size_t blockDim = ra[0];
+                            size_t threadIdx = item.get_local_id();
+                            
                             if (match_i[src] == 0)
                             {
                             int dead = 1;
-                            
+                            // Select first available proposer.
+                            // All threads operate on SAME data.
+                            // NO additional parallelism is used here.
+                            // Any speedup will come from more efficient SM usage.
                             for (auto col_index = rows_i[src]; col_index < rows_i[src+1]; ++col_index){
+                            //for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
+
                                 auto col = cols_i[col_index];
 
                                 const auto nm = match_i[col];
@@ -535,13 +554,26 @@ void maximalMatching(sycl::queue &q,
         auto requests_i = requests.get_access<read_write_t>(h);
 
 
-        h.parallel_for(VertexSize,
-                        [=](sycl::id<1> src) {                         
+        h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
+        //h.parallel_for(VertexSize,[=](sycl::id<1> src) {                         
+                            //Look at all blue vertices and let them make requests.
+                            sycl::group<1> gr = item.get_group();
+                            sycl::range<1> ra = gr.get_local_range();
+                            size_t src = gr.get_group_linear_id();
+                            size_t blockDim = ra[0];
+                            size_t threadIdx = item.get_local_id();                   
                             //Look at all red vertices.
                             if (match_i[src] == 1)
                             {
-                            //Select first available proposer.
+                            // Select first available proposer.
+                            // All threads operate on SAME data.
+                            // NO additional parallelism is used here.
+                            // Any speedup will come from more efficient SM usage.
                             for (auto col_index = rows_i[src]; col_index < rows_i[src+1]; ++col_index){
+                            // Each thread operates on different data
+                            // There is additional parallelism.
+                            //for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
+
                                 auto col = cols_i[col_index];
                                 //Only respond to blue neighbours.
                                 if (match_i[col] == 0)
@@ -571,9 +603,16 @@ void maximalMatching(sycl::queue &q,
         auto requests_i = requests.get_access<read_t>(h);
 
 
-        h.parallel_for(VertexSize,
-                        [=](sycl::id<1> src) {                         
-
+        //h.parallel_for(VertexSize,[=](sycl::id<1> src) {                         
+        h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
+                            // All threads operate on SAME data.
+                            // NO additional parallelism is used here.
+                            // Any speedup will come from more efficient SM usage.
+                            sycl::group<1> gr = item.get_group();
+                            sycl::range<1> ra = gr.get_local_range();
+                            size_t src = gr.get_group_linear_id();
+                            size_t blockDim = ra[0];
+                            size_t threadIdx = item.get_local_id();   
                             const auto r = requests_i[src];
 
                             //Only unmatched vertices make requests.
@@ -590,9 +629,11 @@ void maximalMatching(sycl::queue &q,
                                 //Match the vertices if the request was mutual.
                                 // cant get this compile
                                 //  match_i[src] = 4 + min(src, r);
-                                if (src < r)
-                                match_i[src] = 4 + src;
-                                else 
+                                //if (src < r)
+                                //match_i[src] = 4 + src;
+                                //else 
+                                //match_i[src] = 4 + r;
+                                // This way the matched vertices point to each other.
                                 match_i[src] = 4 + r;
                             }
                             }            
@@ -633,30 +674,59 @@ void maximalMatching(sycl::queue &q,
 
     } while(flag);
 
+    
+    sycl::buffer<int> checkMatch{VertexSize};
+
+    {
+        const auto write_t = sycl::access::mode::write;
+
+        auto cm_i = checkMatch.get_access<write_t>();
+
+        for (int i = 0; i < vertexNum; i++) {
+            cm_i[i] = 0;
+        }
+    }
+
+    bool validMatch = true;
     {
         const auto read_t = sycl::access::mode::read;
         const auto read_write_t = sycl::access::mode::read_write;
 
         auto m = match.get_access<read_t>();
         auto cs = colsum.get_access<read_write_t>();
-
+        auto cm_i = checkMatch.get_access<read_write_t>();
         cs[0] = 0;
         cs[1] = 0;
         cs[2] = 0;
 
         for (int i = 0; i < vertexNum; i++) {
-        if(m[i] < 4)
-            ++cs[m[i]];
-        //printf("%d %d\n",i,m[i]);
+            if(m[i] < 4)
+                ++cs[m[i]];
+            else if(m[i] >= 4)
+                ++cm_i[i];
         }
+        #ifdef NDEBUG
         std::cout << "red count : " << cs[0] << std::endl;
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
         std::cout << "matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
-    
+        for (int i = 0; i < vertexNum; i++) {
+            if(cm_i[i] > 1){
+                validMatch = false;
+                printf("Error %d is matched %d times\n", i, cm_i[i]);
+            }
+        }  
+        #endif
+        syclinitmatchc = vertexNum-(cs[0]+cs[1]+cs[2]);
+
+    }
+    if(validMatch){
+        printf("Match 1 is valid\n");
     }
     return;
 }
+
+// auxilliary match
 
 // To ensure no single vertx in an even level is used to form 
 // 2 or more augmenting paths in one iteration. 
@@ -1014,16 +1084,18 @@ void maximalMatching(sycl::queue &q,
             else if(m[i] >= 4)
                 ++cm_i[i];
         }
+        #ifdef NDEBUG
         std::cout << "red count : " << cs[0] << std::endl;
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
-        std::cout << "aux matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
+        std::cout << "matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
         for (int i = 0; i < vertexNum; i++) {
             if(cm_i[i] > 1){
                 validMatch = false;
                 printf("Error %d is matched %d times\n", i, cm_i[i]);
             }
         }  
+        #endif
 
     }
     if(validMatch){
