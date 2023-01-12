@@ -31,6 +31,7 @@ sycl::buffer<unsigned int> MD5R{dMD5R, HashSize};
 
 // Frontier level synchronization w pred
 void maximalMatching(sycl::queue &q, 
+                int & syclinitmatchc,
                 sycl::buffer<unsigned int> &rows, 
                 sycl::buffer<unsigned int> &cols, 
                 sycl::buffer<int> &requests,
@@ -346,6 +347,7 @@ void maximalMatching(sycl::queue &q,
                 printf("Error %d is matched %d times\n", i, cm_i[i]);
             }
         }  
+        syclinitmatchc = vertexNum-(cs[0]+cs[1]+cs[2]);
 
     }
     if(validMatch){

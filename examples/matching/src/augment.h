@@ -38,6 +38,7 @@
 #define AUGMENT_h
 
 void augment_a(sycl::queue &q, 
+                int & matchCount,
                 sycl::buffer<unsigned int> &rows, 
                 sycl::buffer<unsigned int> &cols, 
                 sycl::buffer<int> &pred,
@@ -393,7 +394,7 @@ void augment_a(sycl::queue &q,
                 printf("Error %d is matched %d times\n", i, cm_i[i]);
             }
         }  
-
+        matchCount = vertexNum-(cs[0]+cs[1]+cs[2]);
     }
     if(validMatch){
         printf("Match 3 is valid\n");

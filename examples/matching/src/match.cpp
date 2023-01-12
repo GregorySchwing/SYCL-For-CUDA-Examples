@@ -93,17 +93,32 @@ int main(int argc, char *argv[]) {
   sycl::nd_range<1> test{NumWorkItems, WorkGroupSize};
   printf("get_local_range %lu get_global_range %lu get_group_range %lu \n", test.get_local_range()[0],  test.get_global_range()[0],  test.get_group_range()[0]);
 
+
+  chrono::time_point<std::chrono::system_clock> begin, end;
+	std::chrono::duration<double> elapsed_seconds_max, elapsed_seconds_edge, elapsed_seconds_mvc;
+
+  begin = std::chrono::system_clock::now(); 
   //maximalMatching();
   // This kernel is fine as is for use in a search tree. 
   // Each subkernel should be logically kernelized by available
   // resources.
+  chrono::time_point<std::chrono::system_clock> initial_match_begin, initial_match_end;
+  initial_match_begin = std::chrono::system_clock::now(); 
+  int syclinitmatchc;
   maximalMatching(myQueue, 
+                syclinitmatchc,
                 rows, 
                 cols, 
                 requests,
                 match,
                 graph.vertexNum,
                 config.barrier);
+  initial_match_end = std::chrono::system_clock::now(); 
+	elapsed_seconds_max = initial_match_end - initial_match_begin; 
+
+  printf("\nElapsed Time for SYCL Initial Max Match: %f\n",elapsed_seconds_max.count());
+  printf("SYCL initial match count is: %u\n", syclinitmatchc);
+
   // These arrays are uncompromising.
   sycl::buffer<int> dist{VertexSize};
   sycl::buffer<int> blossom{VertexSize};
@@ -163,7 +178,9 @@ int main(int argc, char *argv[]) {
                   graph.vertexNum,
                   config.barrier);
 
+  int syclmatchc = 0;
   augment_a(myQueue, 
+            syclmatchc,
             rows, 
             cols, 
             pred,
@@ -226,10 +243,21 @@ int main(int argc, char *argv[]) {
 
   //augment_b
   
+
+  end = std::chrono::system_clock::now(); 
+	elapsed_seconds_max = end - begin; 
+
+  printf("\nElapsed Time for SYCL Max Match: %f\n",elapsed_seconds_max.count());
+  printf("SYCL match count is: %u\n", syclmatchc);
+  fflush(stdout);
   // Test matching against serial edmonds
+  begin = std::chrono::system_clock::now(); 
   EdmondsSerial e(graph);
   int matchc = e.edmonds();
+  end = std::chrono::system_clock::now(); 
+	elapsed_seconds_max = end - begin; 
   // matchc is number of matched edges
+  printf("\nElapsed Time for Serial edmonds Max Match: %f\n",elapsed_seconds_max.count());
   printf("Serial max matching count : %d\n", 2*matchc);
   return 0;
 }
