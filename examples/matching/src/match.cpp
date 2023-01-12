@@ -121,7 +121,12 @@ int main(int argc, char *argv[]) {
 
   // These arrays are uncompromising.
   sycl::buffer<int> dist{VertexSize};
+  // when a BFS round comes upon a blossom
+  // the blossom starts at the head and advances the
+  // frontier to all outgoing edges of each node in the blossom
   sycl::buffer<int> blossom{VertexSize};
+  sycl::buffer<int> fll{VertexSize};
+  sycl::buffer<int> bll{VertexSize};
 
   // For bt'ing. This array is uncompromising.
   // it is neccessary to get the starting vertex
@@ -139,6 +144,8 @@ int main(int argc, char *argv[]) {
   // This kernel is fine as is for use in a search tree. 
   // Each subkernel should be logically kernelized by available
   // resources.
+  chrono::time_point<std::chrono::system_clock> BFS_begin, BFS_end;
+  BFS_begin = std::chrono::system_clock::now(); 
   alternatingBFSTree(myQueue, 
                     rows, 
                     cols, 
@@ -149,7 +156,9 @@ int main(int argc, char *argv[]) {
                     degree,
                     match,
                     graph.vertexNum);
-
+  BFS_end = std::chrono::system_clock::now(); 
+	elapsed_seconds_max = BFS_end - BFS_begin; 
+  printf("\nElapsed Time for SYCL BFS: %f\n",elapsed_seconds_max.count());
   
   // To identify one and only one Augmenting path 
   // to use the starting v.
@@ -167,6 +176,8 @@ int main(int argc, char *argv[]) {
   // but at (2/3)n can be in an forest of disjoint augmenting paths.
 
   // This kernel should be modified for use in a search tree.
+  chrono::time_point<std::chrono::system_clock> aux_matching_begin, aux_matching_end;
+  aux_matching_begin = std::chrono::system_clock::now(); 
   maximalMatching(myQueue, 
                   rows, 
                   cols, 
@@ -178,6 +189,12 @@ int main(int argc, char *argv[]) {
                   graph.vertexNum,
                   config.barrier);
 
+  aux_matching_end = std::chrono::system_clock::now(); 
+	elapsed_seconds_max = aux_matching_end - aux_matching_begin; 
+  printf("\nElapsed Time for SYCL Aux matching: %f\n",elapsed_seconds_max.count());
+  
+  chrono::time_point<std::chrono::system_clock> augment_begin, augment_end;
+  augment_begin = std::chrono::system_clock::now(); 
   int syclmatchc = 0;
   augment_a(myQueue, 
             syclmatchc,
@@ -191,6 +208,9 @@ int main(int argc, char *argv[]) {
             auxMatch,
             winningAugmentingPath,
             graph.vertexNum);
+  augment_end = std::chrono::system_clock::now(); 
+	elapsed_seconds_max = augment_end - augment_begin; 
+  printf("\nElapsed Time for SYCL augment: %f\n",elapsed_seconds_max.count());
   
   /*
   int matchc =  edmonds(myQueue, 
