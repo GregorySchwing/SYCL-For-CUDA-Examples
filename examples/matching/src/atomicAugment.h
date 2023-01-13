@@ -47,12 +47,20 @@ void atomicAugment_a(sycl::queue &q,
                 sycl::buffer<int> &start,
                 sycl::buffer<int> &depth,
                 sycl::buffer<int> &match,
+                sycl::buffer<int> &requests,
                 sycl::buffer<uint64_t> &bridgeVertex,
-                const int vertexNum){
+                const int vertexNum,
+                const unsigned int barrier = 0x88B81733){
 
     constexpr const size_t SingletonSz = 1;
+    constexpr const size_t TripletonSz = 1;
 
     const sycl::range Singleton{SingletonSz};
+    const sycl::range Tripleton{TripletonSz};
+
+    sycl::buffer<unsigned int> selectBarrier {Singleton};
+    sycl::buffer<bool> keepMatching{Singleton};
+    sycl::buffer<unsigned int> colsum {Tripleton};
 
     // Expanded
     sycl::buffer<bool> expanded{Singleton};
@@ -67,14 +75,34 @@ void atomicAugment_a(sycl::queue &q,
     const sycl::range WorkGroupSize{threadsPerBlock};
     sycl::nd_range<1> test{NumWorkItems, WorkGroupSize};
 
+
+    // Initialize input data
+    {
+        const auto read_t = sycl::access::mode::read;
+        const auto dwrite_t = sycl::access::mode::discard_write;
+
+        auto sb = selectBarrier.get_access<dwrite_t>();
+        auto km = keepMatching.get_access<dwrite_t>();
+        auto cs = colsum.get_access<dwrite_t>();
+        sb[0] = barrier;
+        km[0] = true;
+        cs[0] = 0;
+        cs[1] = 0;
+        cs[2] = 0;
+
+        std::cout << "selectBarrier " << sb[0] << std::endl;
+    }
+
     // Initialize input data
     // Command Group creation
     auto cg = [&](sycl::handler &h) {    
         const auto dwrite_t = sycl::access::mode::discard_write;
 
         auto b_i = bridgeVertex.get_access<dwrite_t>(h);
+        auto requests_i = requests.get_access<dwrite_t>(h);
+
         h.parallel_for(VertexSize,
-                        [=](sycl::id<1> i) { b_i[i] = 0; });
+                        [=](sycl::id<1> i) { b_i[i] = 0; requests_i[i] = -1;});
     };
     q.submit(cg);
 
@@ -110,8 +138,9 @@ void atomicAugment_a(sycl::queue &q,
                             size_t blockDim = ra[0];
                             size_t threadIdx = item.get_local_id();
                             auto srcStart = start_i[src];
-                            if (b_i[srcStart] != 0)
-                                return;
+                            // Should this be dist?
+                            //if (b_i[srcStart] != 0)
+                            //    return;
                             auto srcLevel = dist_i[src];
                             auto srcMatch = match_i[src];
 
@@ -140,8 +169,10 @@ void atomicAugment_a(sycl::queue &q,
                                     // Augment path. 
                                     // I could move the start condition
                                     // into the body and set blossoms also.
-                                    uint32_t leastSignificantWord = cl::sycl::min((uint32_t)src, col);
-                                    uint32_t mostSignificantWord = cl::sycl::max((uint32_t)src, col);
+                                    //uint32_t leastSignificantWord = cl::sycl::min((uint32_t)src, col);
+                                    //uint32_t mostSignificantWord = cl::sycl::max((uint32_t)src, col);
+                                    uint32_t leastSignificantWord = src;
+                                    uint32_t mostSignificantWord = col;
                                     uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
                                     b_i[srcStart] = edgePair;
 
@@ -158,8 +189,11 @@ void atomicAugment_a(sycl::queue &q,
                                     // Augment path
                                     // I could move the start condition
                                     // into the body and set blossoms also.
-                                    uint32_t leastSignificantWord = cl::sycl::min((uint32_t)src, col);
-                                    uint32_t mostSignificantWord = cl::sycl::max((uint32_t)src, col);
+                                    //uint32_t leastSignificantWord = cl::sycl::min((uint32_t)src, col);
+                                    //uint32_t mostSignificantWord = cl::sycl::max((uint32_t)src, col);
+                                    uint32_t leastSignificantWord = src;
+                                    uint32_t mostSignificantWord = col;
+
                                     uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
                                     b_i[srcStart] = edgePair;
                                 }
@@ -168,24 +202,137 @@ void atomicAugment_a(sycl::queue &q,
     };
     q.submit(cg2);
 
+    // Color vertices
+    // Request vertices - one workitem per workgroup
+    // Command Group creation
+    auto cg3 = [&](sycl::handler &h) { 
+        const auto read_t = sycl::access::mode::read;
+        const auto read_write_t = sycl::access::mode::read_write;
+        const auto dwrite_t = sycl::access::mode::discard_write;
+        const auto write_t = sycl::access::mode::write;
 
+        // dist
+        auto sb = selectBarrier.get_access<read_t>(h);
+        auto randNum = rand();
+        auto aMD5K = MD5K.get_access<read_t>(h);
+        auto aMD5R = MD5R.get_access<read_t>(h);
 
-    auto cg3 = [&](sycl::handler &h) {    
+        auto b_i = bridgeVertex.get_access<read_t>(h);
+
+        auto match_i = match.get_access<read_write_t>(h);
+        auto km = keepMatching.get_access<write_t>(h);
+
+        h.parallel_for(VertexSize,
+                        [=](sycl::id<1> i) { 
+            // Unnecessary
+            // if (i >= vertexNum) return;
+
+            // Only match the srcs of bridges
+            if (b_i[i] == 0)
+                return;
+            
+            // cant be type dwrite_t (must be write_t) or this is always reacher somehow.
+            km[0] = true;
+            // Some vertices can still match.
+            // TODO: template the hash functions in hashing/ for testing here.
+            //Start hashing.
+            uint h0 = 0x67452301, h1 = 0xefcdab89, h2 = 0x98badcfe, h3 = 0x10325476;
+            uint a = h0, b = h1, c = h2, d = h3, e, f, g = i;
+
+            for (int j = 0; j < 16; ++j)
+            {
+            f = (b & c) | ((~b) & d);
+
+            e = d;
+            d = c;
+            c = b;
+            b += LEFTROTATE(a + f + aMD5K[j] + g, aMD5R[j]);
+            a = e;
+
+            h0 += a;
+            h1 += b;
+            h2 += c;
+            h3 += d;
+            g *= randNum;
+            }
+            match_i[i] = ((h0 + h1 + h2 + h3) < sb[0] ? 0 : 1);
+        });
+    };
+    q.submit(cg3);
+
+    // Request vertices - one workitem per workgroup
+    // Command Group creation
+    auto cg4 = [&](sycl::handler &h) {    
         const auto read_t = sycl::access::mode::read;
         const auto write_t = sycl::access::mode::write;
         const auto read_write_t = sycl::access::mode::read_write;
 
-        auto rows_i = rows.get_access<read_t>(h);
-        auto cols_i = cols.get_access<read_t>(h);
-        auto b_i = bridgeVertex.get_access<read_write_t>(h);
-        auto dist_i = dist.get_access<read_t>(h);
+        auto match_i = match.get_access<read_t>(h);
+        auto b_i = bridgeVertex.get_access<read_t>(h);
         auto start_i = start.get_access<read_t>(h);
+        auto requests_i = requests.get_access<write_t>(h);
 
-        auto match_i = match.get_access<read_write_t>(h);
+        h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {                
+                        //Look at all blue vertices and let them make requests.
+                            //Look at all blue vertices and let them make requests.
+                            sycl::group<1> gr = item.get_group();
+                            sycl::range<1> ra = gr.get_local_range();
+                            sycl::range<1> numV = gr.get_group_range();
+                            size_t srcStart = gr.get_group_linear_id();
+                            size_t blockDim = ra[0];
+                            size_t threadIdx = item.get_local_id();
+                            auto edgePair = b_i[srcStart];
+                            // This is necessarily to prevent from trying to match non-bridge srcs
+                            if (edgePair == 0)
+                                return;
 
+                            uint32_t srcStartTest = start_i[(uint32_t)edgePair];
+                            if (srcStartTest != srcStart)
+                                printf("MAJOR ERROR!!!!\n srcStart %u != start[u] %u", srcStart, srcStartTest);
+                            
+                            uint32_t colStart = start_i[(edgePair >> 32)];
+                            //Look at all blue vertices and let them make requests.
+                            if (match_i[srcStart] == 0){
+                                int dead = 1;
+                                const auto nm = match_i[colStart];
+                                //Do we have an unmatched neighbour?
+                                if (nm < 4)
+                                {
+                                    //Is this neighbour red?
+                                    if (nm == 1)
+                                    {
+                                        requests_i[srcStart] = colStart;
+                                        return;
+                                    }
+                                    
+                                    dead = 0;
+                                }
+                                requests_i[srcStart] = vertexNum + dead;
+                            }
+                            else
+                            {
+                                //Clear request value.
+                                requests_i[srcStart] = vertexNum;
+                            }     
+             
+    });
+    };
+    q.submit(cg4);
 
-        h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
-        //h.parallel_for(VertexSize,[=](sycl::id<1> src) {                         
+    // Request vertices - one workitem per workgroup
+    // Command Group creation
+    auto cg5 = [&](sycl::handler &h) {    
+        const auto read_t = sycl::access::mode::read;
+        const auto write_t = sycl::access::mode::write;
+        const auto read_write_t = sycl::access::mode::read_write;
+
+        auto match_i = match.get_access<read_t>(h);
+        auto b_i = bridgeVertex.get_access<read_t>(h);
+        auto start_i = start.get_access<read_t>(h);
+        auto requests_i = requests.get_access<write_t>(h);
+
+        h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {                
+                        //Look at all blue vertices and let them make requests.
                             //Look at all blue vertices and let them make requests.
                             sycl::group<1> gr = item.get_group();
                             sycl::range<1> ra = gr.get_local_range();
@@ -201,16 +348,98 @@ void atomicAugment_a(sycl::queue &q,
                             if (edgePair == 0)
                                 return;
 
-                            uint32_t bridge_u = (uint32_t)edgePair;
-                            uint32_t bridge_v = (edgePair >> 32);
+                            uint32_t srcStart = start_i[(uint32_t)edgePair];
+                            uint32_t colStart = start_i[(edgePair >> 32)];
 
-                            sycl::atomic_ref<uint64_t, sycl::memory_order::relaxed, sycl::memory_scope::device, 
-                            sycl::access::address_space::global_space> aref(b_i[bridge_u]);
-
-        });
+                            //Look at all red vertices.
+                            if (match_i[srcStart] == 1)
+                            {
+                                //Only respond to blue neighbours.
+                                if (match_i[colStart] == 0)
+                                {
+                                    //Avoid data thrashing be only looking at the request value of blue neighbours.
+                                    if (requests_i[colStart] == srcStart)
+                                    {
+                                        requests_i[srcStart] = colStart;
+                                        return;
+                                    }
+                                }
+                            }
+             
+    });
     };
-    q.submit(cg3);
+    q.submit(cg5);
 
+
+    // Request vertices - one workitem per workgroup
+    // Command Group creation
+    auto cg6 = [&](sycl::handler &h) {    
+        const auto read_t = sycl::access::mode::read;
+        const auto write_t = sycl::access::mode::write;
+        const auto read_write_t = sycl::access::mode::read_write;
+
+        auto match_i = match.get_access<read_write_t>(h);
+        auto b_i = bridgeVertex.get_access<read_t>(h);
+        auto start_i = start.get_access<read_t>(h);
+        auto requests_i = requests.get_access<read_t>(h);
+
+        h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {                
+                        //Look at all blue vertices and let them make requests.
+                            //Look at all blue vertices and let them make requests.
+                            sycl::group<1> gr = item.get_group();
+                            sycl::range<1> ra = gr.get_local_range();
+                            sycl::range<1> numV = gr.get_group_range();
+                            size_t src = gr.get_group_linear_id();
+                            size_t blockDim = ra[0];
+                            size_t threadIdx = item.get_local_id();
+                            auto edgePair = b_i[src];
+                            // This is necessarily a smaller number
+                            // Since either u or v in (u,v) can be present
+                            // in more than one edgePair, we need atomics below.
+                            // Minimizing the amount of serialization from atomics
+                            if (edgePair == 0)
+                                return;
+
+                            uint32_t srcStart = start_i[(uint32_t)edgePair];
+                            uint32_t colStart = start_i[(edgePair >> 32)];
+
+                            const auto r = requests_i[srcStart];
+
+                            //Only unmatched vertices make requests.
+                            if (r == vertexNum + 1)
+                            {
+                                //This is vertex without any available neighbours, discard it.
+                                match_i[srcStart] = 2;
+                            }
+                            else if (r < vertexNum)
+                            {
+                                //This vertex has made a valid request.
+                                if (requests_i[r] == srcStart)
+                                {
+                                    //Match the vertices if the request was mutual.
+                                    // cant get this compile
+                                    //  match_i[src] = 4 + min(src, r);
+                                    //if (src < r)
+                                    //match_i[src] = 4 + src;
+                                    //else 
+                                    //match_i[src] = 4 + r;
+                                    // This way the matched vertices point to each other.
+                                    match_i[srcStart] = 4 + r;
+                                }
+                            }           
+             
+    });
+    };
+    q.submit(cg6);
+
+/*
+                            sycl::atomic_ref<uint64_t, sycl::memory_order::relaxed, sycl::memory_scope::device, 
+                            sycl::access::address_space::global_space> ref_b_u(b_i[start_i[bridge_u]]);
+    
+                            sycl::atomic_ref<uint64_t, sycl::memory_order::relaxed, sycl::memory_scope::device, 
+                            sycl::access::address_space::global_space> ref_b_v(b_i[start_i[bridge_v]]);
+
+*/
 
     /*
     // Can't figure out how to do parallel.  I could use a mutex.
@@ -295,9 +524,7 @@ void atomicAugment_a(sycl::queue &q,
             cm_i[i] = 0;
         }
     }
-    constexpr const size_t TripletonSz = 3;
-    const sycl::range Tripleton{TripletonSz};
-    sycl::buffer<unsigned int> colsum {Tripleton};
+
     bool validMatch = true;
     {
         const auto read_t = sycl::access::mode::read;

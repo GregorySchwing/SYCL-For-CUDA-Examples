@@ -470,7 +470,7 @@ void maximalMatchingNDItem(sycl::queue &q,
                             size_t src = gr.get_group_linear_id();
                             size_t blockDim = ra[0];
                             size_t threadIdx = item.get_local_id();
-                            
+                            // only blue vertices
                             if (match_i[src] == 0)
                             {
                             int dead = 1;
