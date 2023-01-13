@@ -102,7 +102,9 @@ void atomicAugment_a(sycl::queue &q,
         auto requests_i = requests.get_access<dwrite_t>(h);
 
         h.parallel_for(VertexSize,
-                        [=](sycl::id<1> i) { b_i[i] = 0; requests_i[i] = -1;});
+                        [=](sycl::id<1> i) { 
+                            b_i[i] = 0; 
+                            requests_i[i] = -1;});
     };
     q.submit(cg);
 
@@ -116,6 +118,10 @@ void atomicAugment_a(sycl::queue &q,
     // If bridges[src] < bridges[col], bridges[src] = 0
     // If bridges[src] > bridges[col], bridges[col] = 0
 
+
+    // In order to write to the bridge array my src and my neighbors src must be unmatched.
+    // Therefore, the last bridge pair before matching will be in the array for one of the 
+    // matched vertices.  Could consider writing it to the other in match kernel for completeness.
     auto cg2 = [&](sycl::handler &h) {    
         const auto read_t = sycl::access::mode::read;
         const auto write_t = sycl::access::mode::write;
@@ -130,7 +136,6 @@ void atomicAugment_a(sycl::queue &q,
 
         h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
         //h.parallel_for(VertexSize,[=](sycl::id<1> src) {                         
-                            //Look at all blue vertices and let them make requests.
                             sycl::group<1> gr = item.get_group();
                             sycl::range<1> ra = gr.get_local_range();
                             sycl::range<1> numV = gr.get_group_range();
@@ -138,9 +143,11 @@ void atomicAugment_a(sycl::queue &q,
                             size_t blockDim = ra[0];
                             size_t threadIdx = item.get_local_id();
                             auto srcStart = start_i[src];
-                            // Should this be dist?
-                            //if (b_i[srcStart] != 0)
-                            //    return;
+                            // This is how I loop.
+                            // In a bridge successfully matched then the srcStart will be matched.
+                            if (match_i[srcStart] >= 4)
+                                return;
+
                             auto srcLevel = dist_i[src];
                             auto srcMatch = match_i[src];
 
@@ -161,11 +168,13 @@ void atomicAugment_a(sycl::queue &q,
                                 // Odd level aug-path
                                 // (start_i[i] != start_i[auxMatch_i[i]])
                                 // prevents blossoms from claiming a stake
+                                // last condition  match_i[start_i[col]] < 4 lets me loop the augment
                                 } else if (srcLevel % 2 == 1 &&
                                             srcMatch >= 4 &&
                                             dist_i[col] % 2 == 1 &&
                                             match_i[col] >= 4 &&
-                                            srcStart != start_i[col]){
+                                            srcStart != start_i[col] && 
+                                            match_i[start_i[col]] < 4){
                                     // Augment path. 
                                     // I could move the start condition
                                     // into the body and set blossoms also.
@@ -185,7 +194,8 @@ void atomicAugment_a(sycl::queue &q,
                                 } else if (srcLevel % 2 == 0 &&
                                         dist_i[col] % 2 == 0 &&
                                         srcMatch == match_i[col] &&
-                                        srcStart != start_i[col]){
+                                        srcStart != start_i[col] && 
+                                        match_i[start_i[col]] < 4){
                                     // Augment path
                                     // I could move the start condition
                                     // into the body and set blossoms also.
@@ -585,7 +595,7 @@ void atomicAugment_a(sycl::queue &q,
             else if(m[i] >= 4)
                 ++cm_i[i];
         }
-        //#ifdef NDEBUG
+        #ifdef NDEBUG
         std::cout << "red count : " << cs[0] << std::endl;
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
@@ -596,7 +606,7 @@ void atomicAugment_a(sycl::queue &q,
                 printf("Error %d is matched %d times\n", i, cm_i[i]);
             }
         }  
-        //#endif
+        #endif
         matchCount = vertexNum-(cs[0]+cs[1]+cs[2]);
     }
     if(validMatch){
