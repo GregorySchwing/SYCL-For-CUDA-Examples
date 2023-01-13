@@ -178,7 +178,6 @@ void atomicAugment_a(sycl::queue &q,
                                         srcMatch < 4)
                                     {   
                                         matchable_i[srcStart] = true;
-
                                     // Odd level aug-path
                                     // (start_i[i] != start_i[auxMatch_i[i]])
                                     // prevents blossoms from claiming a stake
@@ -499,6 +498,8 @@ void atomicAugment_a(sycl::queue &q,
             auto b_i = bridgeVertex.get_access<read_write_t>(h);
             auto start_i = start.get_access<read_t>(h);
             auto requests_i = requests.get_access<read_t>(h);
+            auto matchable_i = matchable.get_access<write_t>(h);
+
 
             h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {                
                             //Look at all blue vertices and let them make requests.
@@ -509,16 +510,7 @@ void atomicAugment_a(sycl::queue &q,
                                 size_t src = gr.get_group_linear_id();
                                 size_t blockDim = ra[0];
                                 size_t threadIdx = item.get_local_id();
-                                auto edgePair = b_i[src];
-                                // This is necessarily a smaller number
-                                // Since either u or v in (u,v) can be present
-                                // in more than one edgePair, we need atomics below.
-                                // Minimizing the amount of serialization from atomics
-
-                                uint32_t srcStart = start_i[(uint32_t)edgePair];
-                                uint32_t colStart = start_i[(edgePair >> 32)];
-                                // This is necessarily to prevent from trying to match non-bridge srcs or already matched srcs
-                                if (edgePair == 0 || match_i[srcStart]>=4)
+                                if (!matchable_i[src])
                                     return;
 
                                 // Reset bridges, so bridges which were once eligible
@@ -527,8 +519,8 @@ void atomicAugment_a(sycl::queue &q,
                                 // x matched y
                                 // y <- z is now inelibigle and now next round
                                 // x -> y __ z -> a 
-                                if (match_i[colStart]>=4)     
-                                    b_i[src] = 0;
+                                if (match_i[src]>=4)     
+                                    matchable_i[src] = false;
                 
         });
         };
