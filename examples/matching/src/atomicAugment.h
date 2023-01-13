@@ -148,6 +148,7 @@ void atomicAugment_a(sycl::queue &q,
             auto cols_i = cols.get_access<read_t>(h);
             auto match_i = match.get_access<read_t>(h);
             auto matchable_i = matchable.get_access<write_t>(h);
+
             auto dist_i = dist.get_access<read_t>(h);
             auto start_i = start.get_access<read_t>(h);
 
@@ -225,7 +226,7 @@ void atomicAugment_a(sycl::queue &q,
 
             auto b_i = bridgeVertex.get_access<read_t>(h);
             auto matchable_i = matchable.get_access<read_t>(h);
-
+            auto requests_i = requests.get_access<write_t>(h);
             auto match_i = match.get_access<read_write_t>(h);
             auto km = keepMatching.get_access<write_t>(h);
 
@@ -263,6 +264,7 @@ void atomicAugment_a(sycl::queue &q,
                 g *= randNum;
                 }
                 match_i[i] = ((h0 + h1 + h2 + h3) < sb[0] ? 0 : 1);
+                requests_i[i] = -1;
             });
         };
         q.submit(cg3);
@@ -519,8 +521,10 @@ void atomicAugment_a(sycl::queue &q,
                                 // x matched y
                                 // y <- z is now inelibigle and now next round
                                 // x -> y __ z -> a 
-                                if (match_i[src]>=4)     
+                                if (match_i[src]>=4 || requests_i[src] == -1)     
                                     matchable_i[src] = false;
+                                
+                                
                 
         });
         };
