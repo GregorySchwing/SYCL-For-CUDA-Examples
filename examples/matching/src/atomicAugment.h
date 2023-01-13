@@ -164,7 +164,6 @@ void atomicAugment_a(sycl::queue &q,
                                     uint32_t mostSignificantWord = numV[0];
                                     uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
                                     b_i[srcStart] = edgePair;
-
                                 // Odd level aug-path
                                 // (start_i[i] != start_i[auxMatch_i[i]])
                                 // prevents blossoms from claiming a stake
@@ -213,6 +212,7 @@ void atomicAugment_a(sycl::queue &q,
     q.submit(cg2);
 
     bool flag = false;
+    int iter = 0;
     do{
         {
         const auto write_t = sycl::access::mode::write;
@@ -246,8 +246,8 @@ void atomicAugment_a(sycl::queue &q,
                 // Unnecessary
                 // if (i >= vertexNum) return;
 
-                // Only match the srcs of bridges
-                if (b_i[i] == 0)
+                // Only match the srcs of bridges which haven't been matched.
+                if (b_i[i] == 0 || match_i[i]>=4)
                     return;
                 
                 // cant be type dwrite_t (must be write_t) or this is always reacher somehow.
@@ -301,10 +301,9 @@ void atomicAugment_a(sycl::queue &q,
                                 size_t blockDim = ra[0];
                                 size_t threadIdx = item.get_local_id();
                                 auto edgePair = b_i[srcStart];
-                                // This is necessarily to prevent from trying to match non-bridge srcs
-                                if (edgePair == 0)
+                                // This is necessarily to prevent from trying to match non-bridge srcs or already matched srcs
+                                if (edgePair == 0 || match_i[srcStart]>=4)
                                     return;
-
                                 uint32_t srcStartTest = start_i[(uint32_t)edgePair];
                                 if (srcStartTest != srcStart)
                                     printf("MAJOR ERROR!!!!\n srcStart %u != start[u] %u", srcStart, srcStartTest);
@@ -364,11 +363,14 @@ void atomicAugment_a(sycl::queue &q,
                                 // Since either u or v in (u,v) can be present
                                 // in more than one edgePair, we need atomics below.
                                 // Minimizing the amount of serialization from atomics
-                                if (edgePair == 0)
-                                    return;
+                                // This is necessarily to prevent from trying to match non-bridge srcs or already matched srcs
+
 
                                 uint32_t srcStart = start_i[(uint32_t)edgePair];
                                 uint32_t colStart = start_i[(edgePair >> 32)];
+
+                                if (edgePair == 0 || match_i[srcStart]>=4)
+                                    return;
 
                                 //Look at all red vertices.
                                 if (match_i[srcStart] == 1)
@@ -416,12 +418,12 @@ void atomicAugment_a(sycl::queue &q,
                                 // Since either u or v in (u,v) can be present
                                 // in more than one edgePair, we need atomics below.
                                 // Minimizing the amount of serialization from atomics
-                                if (edgePair == 0)
-                                    return;
 
                                 uint32_t srcStart = start_i[(uint32_t)edgePair];
                                 uint32_t colStart = start_i[(edgePair >> 32)];
-
+                                // This is necessarily to prevent from trying to match non-bridge srcs or already matched srcs
+                                if (edgePair == 0 || match_i[srcStart]>=4)
+                                    return;
                                 const auto r = requests_i[srcStart];
 
                                 //Only unmatched vertices make requests.
@@ -480,8 +482,8 @@ void atomicAugment_a(sycl::queue &q,
         }
         #endif
         // just to keep from entering an inf loop till all matching logic is done.
-        flag = false;
-
+        //flag = false;
+        printf("Augment iteration %d\n", iter++);
     } while(flag);
 
 /*
@@ -595,7 +597,7 @@ void atomicAugment_a(sycl::queue &q,
             else if(m[i] >= 4)
                 ++cm_i[i];
         }
-        #ifdef NDEBUG
+        //#ifdef NDEBUG
         std::cout << "red count : " << cs[0] << std::endl;
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
@@ -606,7 +608,7 @@ void atomicAugment_a(sycl::queue &q,
                 printf("Error %d is matched %d times\n", i, cm_i[i]);
             }
         }  
-        #endif
+        //#endif
         matchCount = vertexNum-(cs[0]+cs[1]+cs[2]);
     }
     if(validMatch){
