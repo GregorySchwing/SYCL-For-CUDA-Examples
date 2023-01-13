@@ -7,8 +7,8 @@
 // Trivial augmenting paths are odd depth vertices unmatched in both matches.
 // Matches form either blossoms or augmenting paths (check start vertices)
 void maximalMatching(sycl::queue &q, 
-                sycl::buffer<unsigned int> &rows, 
-                sycl::buffer<unsigned int> &cols, 
+                sycl::buffer<uint32_t> &rows, 
+                sycl::buffer<uint32_t> &cols, 
                 sycl::buffer<int> &requests,
                 sycl::buffer<int> &match,
                 sycl::buffer<int> &dist,

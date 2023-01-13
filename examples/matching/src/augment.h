@@ -39,8 +39,8 @@
 
 void augment_a(sycl::queue &q, 
                 int & matchCount,
-                sycl::buffer<unsigned int> &rows, 
-                sycl::buffer<unsigned int> &cols, 
+                sycl::buffer<uint32_t> &rows, 
+                sycl::buffer<uint32_t> &cols, 
                 sycl::buffer<int> &pred,
                 sycl::buffer<int> &dist,
                 sycl::buffer<int> &start,

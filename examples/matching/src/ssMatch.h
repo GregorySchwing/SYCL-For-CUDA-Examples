@@ -1,6 +1,6 @@
 int edmonds(sycl::queue &myQueue, 
-            sycl::buffer<unsigned int> &rows, 
-            sycl::buffer<unsigned int> &cols, 
+            sycl::buffer<uint32_t> &rows, 
+            sycl::buffer<uint32_t> &cols, 
             const size_t vertexNum){
 
 

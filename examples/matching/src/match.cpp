@@ -57,8 +57,8 @@ int main(int argc, char *argv[]) {
 
 
   // Device input vectors
-  sycl::buffer<unsigned int> rows{graph.srcPtr, RowSize};
-  sycl::buffer<unsigned int> cols{graph.dst, ColSize};
+  sycl::buffer<uint32_t> rows{graph.srcPtr, RowSize};
+  sycl::buffer<uint32_t> cols{graph.dst, ColSize};
   sycl::buffer<int> degree{graph.degree, VertexSize};
   sycl::buffer<int> depth{Singleton};
 
@@ -67,6 +67,8 @@ int main(int argc, char *argv[]) {
   sycl::buffer<int> match{VertexSize};
   // Intermediate vector
   sycl::buffer<int> requests{VertexSize};
+  // Two uint32's are packed into a space.  This way we avoid atomics.
+  sycl::buffer<uint64_t> bridgeVertex{VertexSize};
 
   auto CUDASelector = [](sycl::device const &dev) {
     if (dev.get_platform().get_backend() == sycl::backend::ext_oneapi_cuda) {
@@ -236,6 +238,18 @@ int main(int argc, char *argv[]) {
     currentMatchc = nditem_syclinitmatchc;
     printf("\nIteration %d\n",iteration++);
   } while (prevMatchc != currentMatchc); 
+
+  atomicAugment_a(myQueue, 
+            currentMatchc,
+            rows, 
+            cols, 
+            pred,
+            dist,
+            start,
+            depth,
+            match,
+            bridgeVertex,
+            graph.vertexNum);
   /*
   int matchc =  edmonds(myQueue, 
                       rows, 

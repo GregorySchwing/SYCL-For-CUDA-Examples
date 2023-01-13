@@ -37,16 +37,17 @@
 #ifndef ATOMIC_AUGMENT_h
 #define ATOMIC_AUGMENT_h
 
+#include <CL/sycl.hpp>
 void atomicAugment_a(sycl::queue &q, 
                 int & matchCount,
-                sycl::buffer<unsigned int> &rows, 
-                sycl::buffer<unsigned int> &cols, 
+                sycl::buffer<uint32_t> &rows, 
+                sycl::buffer<uint32_t> &cols, 
                 sycl::buffer<int> &pred,
                 sycl::buffer<int> &dist,
                 sycl::buffer<int> &start,
                 sycl::buffer<int> &depth,
                 sycl::buffer<int> &match,
-                sycl::buffer<int> &bridgeVertex,
+                sycl::buffer<uint64_t> &bridgeVertex,
                 const int vertexNum){
 
     constexpr const size_t SingletonSz = 1;
@@ -73,9 +74,19 @@ void atomicAugment_a(sycl::queue &q,
 
         auto b_i = bridgeVertex.get_access<dwrite_t>(h);
         h.parallel_for(VertexSize,
-                        [=](sycl::id<1> i) { b_i[i] = -1; });
+                        [=](sycl::id<1> i) { b_i[i] = 0; });
     };
     q.submit(cg);
+
+
+    // Write all the 32bit-32bit uint bridges as 64bit uints into a shared array
+    // If more than 1 bridge share a common src, they overwrite each other without
+    // locking.  This is an acceptable race, since we can only use one anyway.
+    // Last bridge to write to bridges[src] is a contender.
+    // Then bridges[src] competes with bridges[col]
+    // If bridges[src] == bridges[col], no competition.
+    // If bridges[src] < bridges[col], bridges[src] = 0
+    // If bridges[src] > bridges[col], bridges[col] = 0
 
     auto cg2 = [&](sycl::handler &h) {    
         const auto read_t = sycl::access::mode::read;
@@ -94,11 +105,12 @@ void atomicAugment_a(sycl::queue &q,
                             //Look at all blue vertices and let them make requests.
                             sycl::group<1> gr = item.get_group();
                             sycl::range<1> ra = gr.get_local_range();
+                            sycl::range<1> numV = gr.get_group_range();
                             size_t src = gr.get_group_linear_id();
                             size_t blockDim = ra[0];
                             size_t threadIdx = item.get_local_id();
                             auto srcStart = start_i[src];
-                            if (b_i[srcStart] != -1)
+                            if (b_i[srcStart] != 0)
                                 return;
                             auto srcLevel = dist_i[src];
                             auto srcMatch = match_i[src];
@@ -111,7 +123,11 @@ void atomicAugment_a(sycl::queue &q,
                                 // odd depth vertex.
                                 if (srcLevel % 2 == 1 &&
                                     srcMatch < 4)
-                                {
+                                {   
+                                    uint32_t leastSignificantWord = src;
+                                    uint32_t mostSignificantWord = numV[0];
+                                    uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
+                                    b_i[srcStart] = edgePair;
 
                                 // Odd level aug-path
                                 // (start_i[i] != start_i[auxMatch_i[i]])
@@ -124,7 +140,10 @@ void atomicAugment_a(sycl::queue &q,
                                     // Augment path. 
                                     // I could move the start condition
                                     // into the body and set blossoms also.
-
+                                    uint32_t leastSignificantWord = cl::sycl::min((uint32_t)src, col);
+                                    uint32_t mostSignificantWord = cl::sycl::max((uint32_t)src, col);
+                                    uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
+                                    b_i[srcStart] = edgePair;
 
 
                                 // Even level aug-path
@@ -139,11 +158,59 @@ void atomicAugment_a(sycl::queue &q,
                                     // Augment path
                                     // I could move the start condition
                                     // into the body and set blossoms also.
+                                    uint32_t leastSignificantWord = cl::sycl::min((uint32_t)src, col);
+                                    uint32_t mostSignificantWord = cl::sycl::max((uint32_t)src, col);
+                                    uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
+                                    b_i[srcStart] = edgePair;
                                 }
                             }
         });
     };
     q.submit(cg2);
+
+
+
+    auto cg3 = [&](sycl::handler &h) {    
+        const auto read_t = sycl::access::mode::read;
+        const auto write_t = sycl::access::mode::write;
+        const auto read_write_t = sycl::access::mode::read_write;
+
+        auto rows_i = rows.get_access<read_t>(h);
+        auto cols_i = cols.get_access<read_t>(h);
+        auto b_i = bridgeVertex.get_access<read_write_t>(h);
+        auto dist_i = dist.get_access<read_t>(h);
+        auto start_i = start.get_access<read_t>(h);
+
+        auto match_i = match.get_access<read_write_t>(h);
+
+
+        h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
+        //h.parallel_for(VertexSize,[=](sycl::id<1> src) {                         
+                            //Look at all blue vertices and let them make requests.
+                            sycl::group<1> gr = item.get_group();
+                            sycl::range<1> ra = gr.get_local_range();
+                            sycl::range<1> numV = gr.get_group_range();
+                            size_t src = gr.get_group_linear_id();
+                            size_t blockDim = ra[0];
+                            size_t threadIdx = item.get_local_id();
+                            auto edgePair = b_i[src];
+                            // This is necessarily a smaller number
+                            // Since either u or v in (u,v) can be present
+                            // in more than one edgePair, we need atomics below.
+                            // Minimizing the amount of serialization from atomics
+                            if (edgePair == 0)
+                                return;
+
+                            uint32_t bridge_u = (uint32_t)edgePair;
+                            uint32_t bridge_v = (edgePair >> 32);
+
+                            sycl::atomic_ref<uint64_t, sycl::memory_order::relaxed, sycl::memory_scope::device, 
+                            sycl::access::address_space::global_space> aref(b_i[bridge_u]);
+
+        });
+    };
+    q.submit(cg3);
+
 
     /*
     // Can't figure out how to do parallel.  I could use a mutex.
