@@ -118,102 +118,103 @@ void atomicAugment_a(sycl::queue &q,
     // If bridges[src] < bridges[col], bridges[src] = 0
     // If bridges[src] > bridges[col], bridges[col] = 0
 
+
+    // In order to write to the bridge array my src and my neighbors src must be unmatched.
+    // Therefore, the last bridge pair before matching will be in the array for one of the 
+    // matched vertices.  Could consider writing it to the other in match kernel for completeness.
+    auto cg2 = [&](sycl::handler &h) {    
+        const auto read_t = sycl::access::mode::read;
+        const auto write_t = sycl::access::mode::write;
+        const auto read_write_t = sycl::access::mode::read_write;
+
+        auto rows_i = rows.get_access<read_t>(h);
+        auto cols_i = cols.get_access<read_t>(h);
+        auto match_i = match.get_access<read_t>(h);
+        auto b_i = bridgeVertex.get_access<read_write_t>(h);
+        auto dist_i = dist.get_access<read_t>(h);
+        auto start_i = start.get_access<read_t>(h);
+
+        h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
+        //h.parallel_for(VertexSize,[=](sycl::id<1> src) {                         
+                            sycl::group<1> gr = item.get_group();
+                            sycl::range<1> ra = gr.get_local_range();
+                            sycl::range<1> numV = gr.get_group_range();
+                            size_t src = gr.get_group_linear_id();
+                            size_t blockDim = ra[0];
+                            size_t threadIdx = item.get_local_id();
+                            auto srcStart = start_i[src];
+                            // This is how I loop.
+                            // In a bridge successfully matched then the srcStart will be matched.
+                            if (match_i[srcStart] >= 4)
+                                return;
+
+                            auto srcLevel = dist_i[src];
+                            auto srcMatch = match_i[src];
+
+                            for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
+
+                                auto col = cols_i[col_index];
+
+                                // Case 1 : trivial augmenting path (end of tree (unmatched) 
+                                // odd depth vertex.
+                                if (srcLevel % 2 == 1 &&
+                                    srcMatch < 4)
+                                {   
+                                    uint32_t leastSignificantWord = src;
+                                    uint32_t mostSignificantWord = numV[0];
+                                    uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
+                                    b_i[srcStart] = edgePair;
+                                    printf("Trivial path %u -> %u\n", srcStart, src);
+                                // Odd level aug-path
+                                // (start_i[i] != start_i[auxMatch_i[i]])
+                                // prevents blossoms from claiming a stake
+                                // last condition  match_i[start_i[col]] < 4 lets me loop the augment
+                                } else if (srcLevel % 2 == 1 &&
+                                            srcMatch >= 4 &&
+                                            dist_i[col] % 2 == 1 &&
+                                            match_i[col] >= 4 &&
+                                            srcStart != start_i[col] && 
+                                            match_i[start_i[col]] < 4){
+                                    // Augment path. 
+                                    // I could move the start condition
+                                    // into the body and set blossoms also.
+                                    //uint32_t leastSignificantWord = cl::sycl::min((uint32_t)src, col);
+                                    //uint32_t mostSignificantWord = cl::sycl::max((uint32_t)src, col);
+                                    uint32_t leastSignificantWord = src;
+                                    uint32_t mostSignificantWord = col;
+                                    uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
+                                    b_i[srcStart] = edgePair;
+
+
+                                // Even level aug-path
+                                // (start_i[i] != start_i[auxMatch_i[i]])
+                                // prevents blossoms from claiming a stake
+                                // i < match_i[i]  ensures only 1 vertex from
+                                // the match tries to claim the SV.
+                                } else if (srcLevel % 2 == 0 &&
+                                        dist_i[col] % 2 == 0 &&
+                                        srcMatch == match_i[col] &&
+                                        srcStart != start_i[col] && 
+                                        match_i[start_i[col]] < 4){
+                                    // Augment path
+                                    // I could move the start condition
+                                    // into the body and set blossoms also.
+                                    //uint32_t leastSignificantWord = cl::sycl::min((uint32_t)src, col);
+                                    //uint32_t mostSignificantWord = cl::sycl::max((uint32_t)src, col);
+                                    uint32_t leastSignificantWord = src;
+                                    uint32_t mostSignificantWord = col;
+
+                                    uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
+                                    b_i[srcStart] = edgePair;
+                                }
+                            }
+        });
+    };
+    q.submit(cg2);
+
     bool flag = false;
     int iter = 0;
     do{
-
-        // In order to write to the bridge array my src and my neighbors src must be unmatched.
-        // Therefore, the last bridge pair before matching will be in the array for one of the 
-        // matched vertices.  Could consider writing it to the other in match kernel for completeness.
-        auto cg2 = [&](sycl::handler &h) {    
-            const auto read_t = sycl::access::mode::read;
-            const auto write_t = sycl::access::mode::write;
-            const auto read_write_t = sycl::access::mode::read_write;
-
-            auto rows_i = rows.get_access<read_t>(h);
-            auto cols_i = cols.get_access<read_t>(h);
-            auto match_i = match.get_access<read_t>(h);
-            auto b_i = bridgeVertex.get_access<read_write_t>(h);
-            auto dist_i = dist.get_access<read_t>(h);
-            auto start_i = start.get_access<read_t>(h);
-
-            h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
-            //h.parallel_for(VertexSize,[=](sycl::id<1> src) {                         
-                                sycl::group<1> gr = item.get_group();
-                                sycl::range<1> ra = gr.get_local_range();
-                                sycl::range<1> numV = gr.get_group_range();
-                                size_t src = gr.get_group_linear_id();
-                                size_t blockDim = ra[0];
-                                size_t threadIdx = item.get_local_id();
-                                auto srcStart = start_i[src];
-                                // This is how I loop.
-                                // In a bridge successfully matched then the srcStart will be matched.
-                                if (match_i[srcStart] >= 4)
-                                    return;
-
-                                auto srcLevel = dist_i[src];
-                                auto srcMatch = match_i[src];
-
-                                for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
-
-                                    auto col = cols_i[col_index];
-
-                                    // Case 1 : trivial augmenting path (end of tree (unmatched) 
-                                    // odd depth vertex.
-                                    if (srcLevel % 2 == 1 &&
-                                        srcMatch < 4)
-                                    {   
-                                        uint32_t leastSignificantWord = src;
-                                        uint32_t mostSignificantWord = numV[0];
-                                        uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
-                                        b_i[srcStart] = edgePair;
-                                    // Odd level aug-path
-                                    // (start_i[i] != start_i[auxMatch_i[i]])
-                                    // prevents blossoms from claiming a stake
-                                    // last condition  match_i[start_i[col]] < 4 lets me loop the augment
-                                    } else if (srcLevel % 2 == 1 &&
-                                                srcMatch >= 4 &&
-                                                dist_i[col] % 2 == 1 &&
-                                                match_i[col] >= 4 &&
-                                                srcStart != start_i[col] && 
-                                                match_i[start_i[col]] < 4){
-                                        // Augment path. 
-                                        // I could move the start condition
-                                        // into the body and set blossoms also.
-                                        //uint32_t leastSignificantWord = cl::sycl::min((uint32_t)src, col);
-                                        //uint32_t mostSignificantWord = cl::sycl::max((uint32_t)src, col);
-                                        uint32_t leastSignificantWord = src;
-                                        uint32_t mostSignificantWord = col;
-                                        uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
-                                        b_i[srcStart] = edgePair;
-
-
-                                    // Even level aug-path
-                                    // (start_i[i] != start_i[auxMatch_i[i]])
-                                    // prevents blossoms from claiming a stake
-                                    // i < match_i[i]  ensures only 1 vertex from
-                                    // the match tries to claim the SV.
-                                    } else if (srcLevel % 2 == 0 &&
-                                            dist_i[col] % 2 == 0 &&
-                                            srcMatch == match_i[col] &&
-                                            srcStart != start_i[col] && 
-                                            match_i[start_i[col]] < 4){
-                                        // Augment path
-                                        // I could move the start condition
-                                        // into the body and set blossoms also.
-                                        //uint32_t leastSignificantWord = cl::sycl::min((uint32_t)src, col);
-                                        //uint32_t mostSignificantWord = cl::sycl::max((uint32_t)src, col);
-                                        uint32_t leastSignificantWord = src;
-                                        uint32_t mostSignificantWord = col;
-
-                                        uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
-                                        b_i[srcStart] = edgePair;
-                                    }
-                                }
-            });
-        };
-        q.submit(cg2);
-
         {
         const auto write_t = sycl::access::mode::write;
         auto km = keepMatching.get_access<write_t>();
@@ -224,6 +225,7 @@ void atomicAugment_a(sycl::queue &q,
         // Color vertices
         // Request vertices - one workitem per workgroup
         // Command Group creation
+        // Could be a problem from edgepairs which can't match not dying.
         auto cg3 = [&](sycl::handler &h) { 
             const auto read_t = sycl::access::mode::read;
             const auto read_write_t = sycl::access::mode::read_write;
@@ -453,13 +455,63 @@ void atomicAugment_a(sycl::queue &q,
         };
         q.submit(cg6);
 
+
+
+        // Request vertices - one workitem per workgroup
+        // Command Group creation
+        auto cg7 = [&](sycl::handler &h) {    
+            const auto read_t = sycl::access::mode::read;
+            const auto write_t = sycl::access::mode::write;
+            const auto read_write_t = sycl::access::mode::read_write;
+
+            auto match_i = match.get_access<read_t>(h);
+            auto b_i = bridgeVertex.get_access<read_write_t>(h);
+            auto start_i = start.get_access<read_t>(h);
+            auto requests_i = requests.get_access<read_t>(h);
+
+            h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {                
+                            //Look at all blue vertices and let them make requests.
+                                //Look at all blue vertices and let them make requests.
+                                sycl::group<1> gr = item.get_group();
+                                sycl::range<1> ra = gr.get_local_range();
+                                sycl::range<1> numV = gr.get_group_range();
+                                size_t src = gr.get_group_linear_id();
+                                size_t blockDim = ra[0];
+                                size_t threadIdx = item.get_local_id();
+                                auto edgePair = b_i[src];
+                                // This is necessarily a smaller number
+                                // Since either u or v in (u,v) can be present
+                                // in more than one edgePair, we need atomics below.
+                                // Minimizing the amount of serialization from atomics
+
+                                uint32_t srcStart = start_i[(uint32_t)edgePair];
+                                uint32_t colStart = start_i[(edgePair >> 32)];
+                                // This is necessarily to prevent from trying to match non-bridge srcs or already matched srcs
+                                if (edgePair == 0 || match_i[srcStart]>=4)
+                                    return;
+
+                                // Reset bridges, so bridges which were once eligible
+                                // will be ineligible next round.
+                                // i.e. x -> y <- z __ a
+                                // x matched y
+                                // y <- z is now inelibigle and now next round
+                                // x -> y __ z -> a 
+                                if (match_i[colStart]>=4)     
+                                    b_i[src] = 0;
+                
+        });
+        };
+        q.submit(cg7);
+
+
+
         {
         const auto read_t = sycl::access::mode::read;
         auto km = keepMatching.get_access<read_t>();
         flag = km[0];
         }
 
-        #ifdef NDEBUG
+        //#ifdef NDEBUG
         {
         const auto read_t = sycl::access::mode::read;
         const auto read_write_t = sycl::access::mode::read_write;
@@ -480,7 +532,7 @@ void atomicAugment_a(sycl::queue &q,
         std::cout << "dead count : " << cs[2] << std::endl;
         std::cout << "matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
         }
-        #endif
+        //#endif
         // just to keep from entering an inf loop till all matching logic is done.
         //flag = false;
         printf("Augment iteration %d\n", iter++);
