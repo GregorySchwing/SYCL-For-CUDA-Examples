@@ -27,8 +27,8 @@
 #include "alternatingBFSTree.h"
 #include "match.h"
 #include "edmondsSerial.h"
-#include "augment.h"
 #include "atomicAugment.h"
+//#include "lockFreeAugment.h"
 
 #include <CL/sycl.hpp>
 // For min(T a, T b)

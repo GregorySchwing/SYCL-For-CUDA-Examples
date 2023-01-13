@@ -67,6 +67,7 @@ void atomicAugment_a(sycl::queue &q,
 
     const size_t numBlocks = vertexNum;
     const sycl::range VertexSize{numBlocks};
+    sycl::buffer<bool> matchable{VertexSize};
 
     const size_t threadsPerBlock = 32;
     const size_t totalThreads = numBlocks * threadsPerBlock;
@@ -100,11 +101,13 @@ void atomicAugment_a(sycl::queue &q,
 
         auto b_i = bridgeVertex.get_access<dwrite_t>(h);
         auto requests_i = requests.get_access<dwrite_t>(h);
+        auto matchable_i = matchable.get_access<dwrite_t>(h);
 
         h.parallel_for(VertexSize,
                         [=](sycl::id<1> i) { 
                             b_i[i] = 0; 
-                            requests_i[i] = -1;});
+                            requests_i[i] = -1;
+                            matchable_i[i] = false;});
     };
     q.submit(cg);
 
@@ -135,6 +138,75 @@ void atomicAugment_a(sycl::queue &q,
         km[0] = false;
         }
 
+        //Initialize matchable srcs bool array.
+        auto cg2 = [&](sycl::handler &h) {    
+            const auto read_t = sycl::access::mode::read;
+            const auto write_t = sycl::access::mode::write;
+            const auto read_write_t = sycl::access::mode::read_write;
+
+            auto rows_i = rows.get_access<read_t>(h);
+            auto cols_i = cols.get_access<read_t>(h);
+            auto match_i = match.get_access<read_t>(h);
+            auto matchable_i = matchable.get_access<write_t>(h);
+            auto dist_i = dist.get_access<read_t>(h);
+            auto start_i = start.get_access<read_t>(h);
+
+            h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
+            //h.parallel_for(VertexSize,[=](sycl::id<1> src) {                         
+                                sycl::group<1> gr = item.get_group();
+                                sycl::range<1> ra = gr.get_local_range();
+                                sycl::range<1> numV = gr.get_group_range();
+                                size_t src = gr.get_group_linear_id();
+                                size_t blockDim = ra[0];
+                                size_t threadIdx = item.get_local_id();
+                                auto srcStart = start_i[src];
+                                // This is how I loop.
+                                // In a bridge successfully matched then the srcStart will be matched.
+                                if (match_i[srcStart] >= 4)
+                                    return;
+
+                                auto srcLevel = dist_i[src];
+                                auto srcMatch = match_i[src];
+
+                                for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
+
+                                    auto col = cols_i[col_index];
+
+                                    // Case 1 : trivial augmenting path (end of tree (unmatched) 
+                                    // odd depth vertex.
+                                    if (srcLevel % 2 == 1 &&
+                                        srcMatch < 4)
+                                    {   
+                                        matchable_i[srcStart] = true;
+
+                                    // Odd level aug-path
+                                    // (start_i[i] != start_i[auxMatch_i[i]])
+                                    // prevents blossoms from claiming a stake
+                                    // last condition  match_i[start_i[col]] < 4 lets me loop the augment
+                                    } else if (srcLevel % 2 == 1 &&
+                                                srcMatch >= 4 &&
+                                                dist_i[col] % 2 == 1 &&
+                                                match_i[col] >= 4 &&
+                                                srcStart != start_i[col] && 
+                                                match_i[start_i[col]] < 4){
+                                        matchable_i[srcStart] = true;
+
+                                    // Even level aug-path
+                                    // (start_i[i] != start_i[auxMatch_i[i]])
+                                    // prevents blossoms from claiming a stake
+                                    // i < match_i[i]  ensures only 1 vertex from
+                                    // the match tries to claim the SV.
+                                    } else if (srcLevel % 2 == 0 &&
+                                            dist_i[col] % 2 == 0 &&
+                                            srcMatch == match_i[col] &&
+                                            srcStart != start_i[col] && 
+                                            match_i[start_i[col]] < 4){
+                                        matchable_i[srcStart] = true;
+                                    }
+                                }
+            });
+        };
+        q.submit(cg2);
 
         // Color vertices
         // Request vertices - one workitem per workgroup
@@ -153,6 +225,7 @@ void atomicAugment_a(sycl::queue &q,
             auto aMD5R = MD5R.get_access<read_t>(h);
 
             auto b_i = bridgeVertex.get_access<read_t>(h);
+            auto matchable_i = matchable.get_access<read_t>(h);
 
             auto match_i = match.get_access<read_write_t>(h);
             auto km = keepMatching.get_access<write_t>(h);
@@ -163,7 +236,7 @@ void atomicAugment_a(sycl::queue &q,
                 // if (i >= vertexNum) return;
 
                 // Only match the srcs of bridges which haven't been matched.
-                if (b_i[i] == 0 || match_i[i]>=4)
+                if (!matchable_i[i])
                     return;
                 
                 // cant be type dwrite_t (must be write_t) or this is always reacher somehow.
@@ -196,7 +269,7 @@ void atomicAugment_a(sycl::queue &q,
         q.submit(cg3);
 
         // Request atomically
-        auto cg2 = [&](sycl::handler &h) {    
+        auto cg4 = [&](sycl::handler &h) {    
             const auto read_t = sycl::access::mode::read;
             const auto write_t = sycl::access::mode::write;
             const auto read_write_t = sycl::access::mode::read_write;
@@ -207,6 +280,8 @@ void atomicAugment_a(sycl::queue &q,
             auto b_i = bridgeVertex.get_access<read_write_t>(h);
             auto dist_i = dist.get_access<read_t>(h);
             auto start_i = start.get_access<read_t>(h);
+            auto matchable_i = matchable.get_access<read_t>(h);
+            auto requests_i = requests.get_access<write_t>(h);
 
             h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
             //h.parallel_for(VertexSize,[=](sycl::id<1> src) {                         
@@ -217,16 +292,15 @@ void atomicAugment_a(sycl::queue &q,
                                 size_t blockDim = ra[0];
                                 size_t threadIdx = item.get_local_id();
                                 auto srcStart = start_i[src];
-                                // This is how I loop.
-                                // In a bridge successfully matched then the srcStart will be matched.
-                                if (match_i[srcStart] >= 4)
-                                    return;
 
+                                // I am blue
                                 if (match_i[srcStart] == 0){
 
                                     auto srcLevel = dist_i[src];
                                     auto srcMatch = match_i[src];
 
+                                    // I know that someone src'ed at srcstart had an bridge.                                    
+                                    
                                     for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
 
                                         auto col = cols_i[col_index];
@@ -236,21 +310,20 @@ void atomicAugment_a(sycl::queue &q,
                                         // prevents blossoms from claiming a stake
                                         // last condition  match_i[start_i[col]] < 4 lets me loop the augment
                                         if (srcLevel % 2 == 1 &&
-                                                    srcMatch >= 4 &&
-                                                    dist_i[col] % 2 == 1 &&
-                                                    match_i[col] >= 4 &&
-                                                    srcStart != start_i[col] && 
-                                                    match_i[start_i[col]] < 4){
-                                            // Augment path. 
-                                            // I could move the start condition
-                                            // into the body and set blossoms also.
-                                            //uint32_t leastSignificantWord = cl::sycl::min((uint32_t)src, col);
-                                            //uint32_t mostSignificantWord = cl::sycl::max((uint32_t)src, col);
-                                            uint32_t leastSignificantWord = src;
-                                            uint32_t mostSignificantWord = col;
-                                            uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
-                                            b_i[srcStart] = edgePair;
-
+                                            srcMatch >= 4 &&
+                                            dist_i[col] % 2 == 1 &&
+                                            match_i[col] >= 4 &&
+                                            srcStart != start_i[col] && 
+                                            match_i[start_i[col]] < 4){
+                                                const auto colStart = start_i[col];
+                                                const auto nm = match_i[colStart];
+                                                //Is this neighbour red?
+                                                if (nm == 1)
+                                                {
+                                                    // I request a blue vertex
+                                                    requests_i[srcStart] = colStart;
+                                                    return;
+                                                }     
 
                                         // Even level aug-path
                                         // (start_i[i] != start_i[auxMatch_i[i]])
@@ -258,90 +331,26 @@ void atomicAugment_a(sycl::queue &q,
                                         // i < match_i[i]  ensures only 1 vertex from
                                         // the match tries to claim the SV.
                                         } else if (srcLevel % 2 == 0 &&
-                                                dist_i[col] % 2 == 0 &&
-                                                srcMatch == match_i[col] &&
-                                                srcStart != start_i[col] && 
-                                                match_i[start_i[col]] < 4){
-                                            // Augment path
-                                            // I could move the start condition
-                                            // into the body and set blossoms also.
-                                            //uint32_t leastSignificantWord = cl::sycl::min((uint32_t)src, col);
-                                            //uint32_t mostSignificantWord = cl::sycl::max((uint32_t)src, col);
-                                            uint32_t leastSignificantWord = src;
-                                            uint32_t mostSignificantWord = col;
-
-                                            uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
-                                            b_i[srcStart] = edgePair;
+                                            dist_i[col] % 2 == 0 &&
+                                            srcMatch == match_i[col] &&
+                                            srcStart != start_i[col] && 
+                                            match_i[start_i[col]] < 4){
+                                                const auto colStart = start_i[col];
+                                                const auto nm = match_i[colStart];
+                                                //Is this neighbour red?
+                                                if (nm == 1)
+                                                {
+                                                    // I request a blue vertex
+                                                    requests_i[srcStart] = colStart;
+                                                    return;
+                                                }     
                                         }
                                     }
-                                }
-                                else
-                                {
-                                    //Clear request value.
-                                    requests_i[srcStart] = vertexNum;
                                 }
             });
         };
-        q.submit(cg2);
-
-
-        // Request vertices - one workitem per workgroup
-        // Command Group creation
-        auto cg4 = [&](sycl::handler &h) {    
-            const auto read_t = sycl::access::mode::read;
-            const auto write_t = sycl::access::mode::write;
-            const auto read_write_t = sycl::access::mode::read_write;
-
-            auto match_i = match.get_access<read_t>(h);
-            auto b_i = bridgeVertex.get_access<read_t>(h);
-            auto start_i = start.get_access<read_t>(h);
-            auto requests_i = requests.get_access<write_t>(h);
-
-            h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {                
-                            //Look at all blue vertices and let them make requests.
-                                //Look at all blue vertices and let them make requests.
-                                sycl::group<1> gr = item.get_group();
-                                sycl::range<1> ra = gr.get_local_range();
-                                sycl::range<1> numV = gr.get_group_range();
-                                size_t srcStart = gr.get_group_linear_id();
-                                size_t blockDim = ra[0];
-                                size_t threadIdx = item.get_local_id();
-                                auto edgePair = b_i[srcStart];
-                                // This is necessarily to prevent from trying to match non-bridge srcs or already matched srcs
-                                if (edgePair == 0 || match_i[srcStart]>=4)
-                                    return;
-                                uint32_t srcStartTest = start_i[(uint32_t)edgePair];
-                                if (srcStartTest != srcStart)
-                                    printf("MAJOR ERROR!!!!\n srcStart %u != start[u] %u", srcStart, srcStartTest);
-                                
-                                uint32_t colStart = start_i[(edgePair >> 32)];
-                                //Look at all blue vertices and let them make requests.
-                                if (match_i[srcStart] == 0){
-                                    int dead = 1;
-                                    const auto nm = match_i[colStart];
-                                    //Do we have an unmatched neighbour?
-                                    if (nm < 4)
-                                    {
-                                        //Is this neighbour red?
-                                        if (nm == 1)
-                                        {
-                                            requests_i[srcStart] = colStart;
-                                            return;
-                                        }
-                                        
-                                        dead = 0;
-                                    }
-                                    requests_i[srcStart] = vertexNum + dead;
-                                }
-                                else
-                                {
-                                    //Clear request value.
-                                    requests_i[srcStart] = vertexNum;
-                                }     
-                
-        });
-        };
         q.submit(cg4);
+
 
         // Request vertices - one workitem per workgroup
         // Command Group creation
@@ -350,10 +359,13 @@ void atomicAugment_a(sycl::queue &q,
             const auto write_t = sycl::access::mode::write;
             const auto read_write_t = sycl::access::mode::read_write;
 
+            auto rows_i = rows.get_access<read_t>(h);
+            auto cols_i = cols.get_access<read_t>(h);
             auto match_i = match.get_access<read_t>(h);
             auto b_i = bridgeVertex.get_access<read_t>(h);
             auto start_i = start.get_access<read_t>(h);
             auto requests_i = requests.get_access<write_t>(h);
+            auto dist_i = dist.get_access<read_t>(h);
 
             h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {                
                             //Look at all blue vertices and let them make requests.
@@ -364,31 +376,65 @@ void atomicAugment_a(sycl::queue &q,
                                 size_t src = gr.get_group_linear_id();
                                 size_t blockDim = ra[0];
                                 size_t threadIdx = item.get_local_id();
-                                auto edgePair = b_i[src];
-                                // This is necessarily a smaller number
-                                // Since either u or v in (u,v) can be present
-                                // in more than one edgePair, we need atomics below.
-                                // Minimizing the amount of serialization from atomics
-                                // This is necessarily to prevent from trying to match non-bridge srcs or already matched srcs
+                                auto srcStart = start_i[src];
 
+                                // I am red
+                                if (match_i[srcStart] == 1){
 
-                                uint32_t srcStart = start_i[(uint32_t)edgePair];
-                                uint32_t colStart = start_i[(edgePair >> 32)];
+                                    auto srcLevel = dist_i[src];
+                                    auto srcMatch = match_i[src];
 
-                                if (edgePair == 0 || match_i[srcStart]>=4)
-                                    return;
+                                    // I know that someone src'ed at srcstart had an bridge.                                    
+                                    
+                                    for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
 
-                                //Look at all red vertices.
-                                if (match_i[srcStart] == 1)
-                                {
-                                    //Only respond to blue neighbours.
-                                    if (match_i[colStart] == 0)
-                                    {
-                                        //Avoid data thrashing be only looking at the request value of blue neighbours.
-                                        if (requests_i[colStart] == srcStart)
-                                        {
-                                            requests_i[srcStart] = colStart;
-                                            return;
+                                        auto col = cols_i[col_index];
+                                        const auto colStart = start_i[col];
+
+                                        // Odd level aug-path
+                                        // (start_i[i] != start_i[auxMatch_i[i]])
+                                        // prevents blossoms from claiming a stake
+                                        // last condition  match_i[start_i[col]] < 4 lets me loop the augment
+                                        if (srcLevel % 2 == 1 &&
+                                            srcMatch >= 4 &&
+                                            dist_i[col] % 2 == 1 &&
+                                            match_i[col] >= 4 &&
+                                            srcStart != colStart && 
+                                            match_i[colStart] < 4){
+                                                const auto nm = match_i[colStart];
+                                                if (nm == 0)
+                                                {
+                                                    //Avoid data thrashing be only looking at the request value of blue neighbours.
+                                                    if (requests_i[colStart] == srcStart)
+                                                    {
+                                                        requests_i[srcStart] = colStart;
+                                                        return;
+                                                    }
+                                                }    
+
+                                        // Even level aug-path
+                                        // (start_i[i] != start_i[auxMatch_i[i]])
+                                        // prevents blossoms from claiming a stake
+                                        // i < match_i[i]  ensures only 1 vertex from
+                                        // the match tries to claim the SV.
+                                        } else if (srcLevel % 2 == 0 &&
+                                            dist_i[col] % 2 == 0 &&
+                                            srcMatch == match_i[col] &&
+                                            srcStart != colStart && 
+                                            match_i[colStart] < 4){
+
+                                                const auto nm = match_i[colStart];
+                                                //Is this neighbour blue?
+                                                if (nm == 0)
+                                                {
+                                                    //Avoid data thrashing be only looking at the request value of blue neighbours.
+                                                    if (requests_i[colStart] == srcStart)
+                                                    {
+                                                        requests_i[srcStart] = colStart;
+                                                        // pack bridges here?
+                                                        return;
+                                                    }
+                                                }     
                                         }
                                     }
                                 }
@@ -419,41 +465,22 @@ void atomicAugment_a(sycl::queue &q,
                                 size_t src = gr.get_group_linear_id();
                                 size_t blockDim = ra[0];
                                 size_t threadIdx = item.get_local_id();
-                                auto edgePair = b_i[src];
-                                // This is necessarily a smaller number
-                                // Since either u or v in (u,v) can be present
-                                // in more than one edgePair, we need atomics below.
-                                // Minimizing the amount of serialization from atomics
+                                auto srcStart = start_i[src];
 
-                                uint32_t srcStart = start_i[(uint32_t)edgePair];
-                                uint32_t colStart = start_i[(edgePair >> 32)];
                                 // This is necessarily to prevent from trying to match non-bridge srcs or already matched srcs
-                                if (edgePair == 0 || match_i[srcStart]>=4)
+                                if (match_i[srcStart]>=4)
                                     return;
+
                                 const auto r = requests_i[srcStart];
 
-                                //Only unmatched vertices make requests.
-                                if (r == vertexNum + 1)
+                                //This vertex has made a valid request.
+                                if (requests_i[r] == srcStart)
                                 {
-                                    //This is vertex without any available neighbours, discard it.
-                                    match_i[srcStart] = 2;
+                                    //Match the vertices if the request was mutual.
+                                    // matched vertices point to each other.
+                                    match_i[srcStart] = 4 + r;
                                 }
-                                else if (r < vertexNum)
-                                {
-                                    //This vertex has made a valid request.
-                                    if (requests_i[r] == srcStart)
-                                    {
-                                        //Match the vertices if the request was mutual.
-                                        // cant get this compile
-                                        //  match_i[src] = 4 + min(src, r);
-                                        //if (src < r)
-                                        //match_i[src] = 4 + src;
-                                        //else 
-                                        //match_i[src] = 4 + r;
-                                        // This way the matched vertices point to each other.
-                                        match_i[srcStart] = 4 + r;
-                                    }
-                                }           
+                                   
                 
         });
         };
