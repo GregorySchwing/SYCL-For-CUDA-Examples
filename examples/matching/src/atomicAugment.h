@@ -53,7 +53,7 @@ void atomicAugment_a(sycl::queue &q,
                 const unsigned int barrier = 0x88B81733){
 
     constexpr const size_t SingletonSz = 1;
-    constexpr const size_t TripletonSz = 1;
+    constexpr const size_t TripletonSz = 3;
 
     const sycl::range Singleton{SingletonSz};
     const sycl::range Tripleton{TripletonSz};
@@ -805,7 +805,6 @@ void atomicAugment_b(sycl::queue &q,
         };
         q.submit(cg2);
 
-
         // Respond vertices - one workitem per workgroup
         // Command Group creation
         auto cg3 = [&](sycl::handler &h) {    
@@ -827,6 +826,7 @@ void atomicAugment_b(sycl::queue &q,
                             uint32_t curr_u = (uint32_t)edgePair;
                             uint32_t curr_v = (edgePair >> 32);
                             auto depth_u = dist_i[curr_u];
+                            printf("src %u match[src] %u u %u v %u", src[0], match_i[src], curr_u, curr_v);
 
                             // Even bridge, match the bridge vertices.
                             if (depth_u % 2 == 0){
@@ -850,32 +850,56 @@ void atomicAugment_b(sycl::queue &q,
         };
         q.submit(cg3);
 
-        /*
-        auto cg2 = [&](sycl::handler &h) {    
+        constexpr const size_t TripletonSz = 3;
+        const sycl::range Tripleton{TripletonSz};
+        sycl::buffer<unsigned int> colsum {Tripleton};
+        sycl::buffer<int> checkMatch{VertexSize};
+        {
+            bool validMatch = true;
             const auto read_t = sycl::access::mode::read;
-            const auto write_t = sycl::access::mode::write;
-            const auto dwrite_t = sycl::access::mode::discard_write;
             const auto read_write_t = sycl::access::mode::read_write;
+            const auto write_t = sycl::access::mode::write;
 
-            auto pred_i = pred.get_access<read_t>(h);
-            auto dist_i = dist.get_access<read_t>(h);
-            auto start_i = start.get_access<read_t>(h);
-            auto match_i = match.get_access<read_write_t>(h);
+            auto m = match.get_access<read_t>();
+            auto cs = colsum.get_access<read_write_t>();
+            auto cm_i = checkMatch.get_access<read_write_t>();
 
-            h.parallel_for(VertexSize,
-                            [=](sycl::id<1> src) {   
-                if (dist_i[src] > 0 || match_i[src]<4) 
-                    return;      
-                // This is a matched dist 0 vertex.
-                auto acrossTheBridge = match_i[src]-4;
-                auto mySideOfTheBridge = match_i[acrossTheBridge]-4;
-                //printf("src %d srcStart %d srStartMatchedTo %d matchOfSSM %d\n", src[0], acrossTheBridge, mySideOfTheBridge);
-                printf("src %u dead var %u srcStart %d srStartMatchedTo %d matchOfSSM %d\n", src[0], start_i[src], start_i[src], acrossTheBridge, mySideOfTheBridge);
+            cs[0] = 0;
+            cs[1] = 0;
+            cs[2] = 0;
 
-            });
-        };
-        q.submit(cg2);
-        */
+            validMatch = true;
+            for (int i = 0; i < vertexNum; i++) {
+                cm_i[i] = 0;
+            }
+            for (int i = 0; i < vertexNum; i++) {
+                if(m[i] < 4){
+                    //++cm_i[i];
+                    ++cs[m[i]];
+                } else if(m[i] >= 4){
+                    ++cm_i[m[i]-4];
+                }
+                //printf("%d %d\n",i,m[i]);
+            }
+            std::cout << "red count : " << cs[0] << std::endl;
+            std::cout << "blue count : " << cs[1] << std::endl;
+            std::cout << "dead count : " << cs[2] << std::endl;
+            std::cout << "matched count : " << (vertexNum-(cs[0]+cs[1]+cs[2]))/2 << std::endl;
+            matchCount = vertexNum-(cs[0]+cs[1]+cs[2]);
+
+            for (int i = 0; i < vertexNum; i++) {
+                if(cm_i[i] > 1){
+                    validMatch = false;
+                    printf("Error %d is matched %d times\n", i, cm_i[i]);
+                }
+            }  
+            if(validMatch){
+                printf("Match 4 is valid\n");
+            } else {
+                printf("Match 4 is invalid\n");
+            }
+        }
+
 
 }
 
