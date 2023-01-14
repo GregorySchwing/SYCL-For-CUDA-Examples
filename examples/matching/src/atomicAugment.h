@@ -806,21 +806,49 @@ void atomicAugment_b(sycl::queue &q,
         q.submit(cg2);
 
 
+        // Respond vertices - one workitem per workgroup
+        // Command Group creation
+        auto cg3 = [&](sycl::handler &h) {    
+        const auto read_t = sycl::access::mode::read;
+        const auto write_t = sycl::access::mode::write;
+        const auto dwrite_t = sycl::access::mode::discard_write;
+        const auto read_write_t = sycl::access::mode::read_write;
 
-        {
-            const auto read_t = sycl::access::mode::read;
-            const auto read_write_t = sycl::access::mode::read_write;
-            const auto write_t = sycl::access::mode::write;
+        auto b_i = bridgeVertex.get_access<read_t>(h);
+        auto match_i = match.get_access<write_t>(h);
+        auto dist_i = dist.get_access<read_t>(h);
+        auto pred_i = pred.get_access<read_t>(h);
 
-            auto match_i = match.get_access<read_t>();
-            auto dist_i = dist.get_access<read_write_t>();
+        h.parallel_for(VertexSize,
+                        [=](sycl::id<1> src) {                         
+                            if (b_i[src] == 0)
+                                return;
+                            auto edgePair = b_i[src];
+                            uint32_t curr_u = (uint32_t)edgePair;
+                            uint32_t curr_v = (edgePair >> 32);
+                            auto depth_u = dist_i[curr_u];
 
-            for (int i = 0; i < vertexNum; i++) {
-                if (dist_i[i] > 0 || match_i[i]<4) 
-                    continue;
-                printf("src %d srStartMatchedTo %d matchOfSSM %d\n", i, match_i[i]-4, match_i[match_i[i]-4]-4);
-            }
-        }
+                            // Even bridge, match the bridge vertices.
+                            if (depth_u % 2 == 0){
+                                match_i[curr_u] = 4+curr_u;
+                                match_i[curr_v] = 4+curr_v;
+                            }
+
+                            for (auto curr_depth = depth_u; curr_depth > 0; --curr_depth){
+                                auto parent_u = pred_i[curr_u];
+                                auto parent_v = pred_i[curr_v];
+                                if (curr_depth % 2 == 1){
+                                    match_i[curr_u] = 4 + parent_u;
+                                    match_i[curr_v] = 4 + parent_v;
+                                    match_i[parent_u] = 4 + curr_u;
+                                    match_i[parent_v] = 4 + curr_v;
+                                }
+                                curr_u = parent_u;
+                                curr_v = parent_v;
+                            }
+        });
+        };
+        q.submit(cg3);
 
         /*
         auto cg2 = [&](sycl::handler &h) {    

@@ -201,8 +201,11 @@ int main(int argc, char *argv[]) {
     
     augment_end = std::chrono::system_clock::now(); 
     elapsed_seconds_max = augment_end - augment_begin; 
-    printf("\nElapsed Time for SYCL augment: %f\n",elapsed_seconds_max.count());
+    printf("\nElapsed Time for SYCL augment_a: %f\n",elapsed_seconds_max.count());
     printf("\nSYCL augment size: %d\n",currentMatchc/2);
+
+    chrono::time_point<std::chrono::system_clock> augment_b_begin, augment_b_end;
+    augment_b_begin = std::chrono::system_clock::now(); 
 
     atomicAugment_b(myQueue, 
                 currentMatchc,
@@ -215,6 +218,10 @@ int main(int argc, char *argv[]) {
                 bridgeVertex,
                 graph.vertexNum);
 
+    augment_b_end = std::chrono::system_clock::now(); 
+    elapsed_seconds_max = augment_b_end - augment_b_begin; 
+    printf("\nElapsed Time for SYCL augment_b: %f\n",elapsed_seconds_max.count());
+    printf("\nSYCL augment size: %d\n",currentMatchc/2);
     /*
     // To identify one and only one Augmenting path 
     // to use the starting v.
