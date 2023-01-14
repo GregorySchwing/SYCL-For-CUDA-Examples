@@ -83,7 +83,7 @@ void atomicAugment_a(sycl::queue &q,
     {
         const auto read_t = sycl::access::mode::read;
         const auto dwrite_t = sycl::access::mode::discard_write;
-
+        auto b_i = bridgeVertex.get_access<dwrite_t>();
         auto sb = selectBarrier.get_access<dwrite_t>();
         auto km = keepMatching.get_access<dwrite_t>();
         auto cs = colsum.get_access<dwrite_t>();
@@ -92,6 +92,10 @@ void atomicAugment_a(sycl::queue &q,
         cs[0] = 0;
         cs[1] = 0;
         cs[2] = 0;
+
+        for (int i = 0; i < vertexNum; i++) {
+                b_i[i] = 0; 
+        }
 
         std::cout << "selectBarrier " << sb[0] << std::endl;
     }
@@ -499,14 +503,11 @@ void atomicAugment_a(sycl::queue &q,
         // Command Group creation
         auto cg7 = [&](sycl::handler &h) {    
             const auto dwrite_t = sycl::access::mode::discard_write;
-
-            auto b_i = bridgeVertex.get_access<dwrite_t>(h);
             auto requests_i = requests.get_access<dwrite_t>(h);
             auto matchable_i = matchable.get_access<dwrite_t>(h);
 
             h.parallel_for(VertexSize,
                             [=](sycl::id<1> i) { 
-                                b_i[i] = 0; 
                                 requests_i[i] = -1;
                                 matchable_i[i] = false;});
         };
@@ -761,8 +762,8 @@ void atomicAugment_b(sycl::queue &q,
                                     if (srcLevel % 2 == 1 &&
                                                 dist_i[col] % 2 == 1 &&
                                                 srcMatch == match_i[col] &&
-                                                srcStart != start_i[col] && 
-                                                match_i[srcStart] == match_i[start_i[col]]){
+                                                srcStart != start_i[col]){
+                                                //&& match_i[srcStart] == match_i[start_i[col]]){
                                         // It doesnt really matter which bridge wins as long as
                                         // for two bridges (u,v) & (a,b) sharing a (src,dest)
                                         // We dont augment (u,b) or (a,v).
@@ -770,6 +771,7 @@ void atomicAugment_b(sycl::queue &q,
                                         // Then I'll only augment if I'm the smaller of the
                                         // two sources.
                                         // This prevents races of this type since only min(src,dest) will be written to.
+                                        printf("Bridge found in src %u col %u\n", src, col);
                                         if (srcStart < start_i[col]){
                                             uint32_t leastSignificantWord = src;
                                             uint32_t mostSignificantWord = col;
@@ -783,8 +785,8 @@ void atomicAugment_b(sycl::queue &q,
                                     // the match tries to claim the SV.
                                     } else if (srcLevel % 2 == 0 &&
                                             dist_i[col] % 2 == 0 &&
-                                            srcStart != start_i[col]  && 
-                                            match_i[srcStart] == match_i[start_i[col]]){                                        
+                                            srcStart != start_i[col]){
+                                            //&& match_i[srcStart] == match_i[start_i[col]]){
                                         // It doesnt really matter which bridge wins as long as
                                         // for two bridges (u,v) & (a,b) sharing a (src,dest)
                                         // We dont augment (u,b) or (a,v).
@@ -793,6 +795,7 @@ void atomicAugment_b(sycl::queue &q,
                                         // two sources.
                                         // This prevents races of this type since only min(src,dest) will be written to.
                                         // In next kernel i just check if b_i[src]!=0
+                                        printf("Bridge found in src %u col %u\n", src, col);
                                         if (srcStart < start_i[col]){
                                             uint32_t leastSignificantWord = src;
                                             uint32_t mostSignificantWord = col;
@@ -849,6 +852,22 @@ void atomicAugment_b(sycl::queue &q,
         });
         };
         q.submit(cg3);
+
+
+        {
+            const auto read_t = sycl::access::mode::read;
+            const auto read_write_t = sycl::access::mode::read_write;
+            const auto write_t = sycl::access::mode::write;
+            auto b_i = bridgeVertex.get_access<read_t>();
+
+
+            for (int i = 0; i < vertexNum; i++) {
+                if(b_i[i] > 0){
+                    printf("Edgepair %d %u %u\n", i, (uint32_t)b_i[i], b_i[i]>>32);
+                }
+            }  
+            
+        }
 
         constexpr const size_t TripletonSz = 3;
         const sycl::range Tripleton{TripletonSz};
