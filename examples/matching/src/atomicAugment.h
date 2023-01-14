@@ -687,7 +687,7 @@ void atomicAugment_a(sycl::queue &q,
         }
         for (int i = 0; i < vertexNum; i++) {
             if(m[i] < 4){
-                ++cm_i[i];
+                //++cm_i[i];
                 ++cs[m[i]];
             } else if(m[i] >= 4)
                 ++cm_i[m[i]-4];
@@ -697,6 +697,7 @@ void atomicAugment_a(sycl::queue &q,
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
         std::cout << "matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
+        matchCount = vertexNum-(cs[0]+cs[1]+cs[2]);
 
         for (int i = 0; i < vertexNum; i++) {
             if(cm_i[i] > 1){

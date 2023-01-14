@@ -242,25 +242,25 @@ int main(int argc, char *argv[]) {
     
     chrono::time_point<std::chrono::system_clock> augment_begin, augment_end;
     augment_begin = std::chrono::system_clock::now(); 
-    int syclmatchc = 0;
+    //int syclmatchc = 0;
 
-  atomicAugment_a(myQueue, 
-            syclmatchc,
-            rows, 
-            cols, 
-            pred,
-            dist,
-            start,
-            depth,
-            match,
-            requests,
-            bridgeVertex,
-            graph.vertexNum);
+    atomicAugment_a(myQueue, 
+              currentMatchc,
+              rows, 
+              cols, 
+              pred,
+              dist,
+              start,
+              depth,
+              match,
+              requests,
+              bridgeVertex,
+              graph.vertexNum);
 
     augment_end = std::chrono::system_clock::now(); 
     elapsed_seconds_max = augment_end - augment_begin; 
     printf("\nElapsed Time for SYCL augment: %f\n",elapsed_seconds_max.count());
-    printf("\nSYCL augment size: %d\n",syclmatchc);
+    printf("\nSYCL augment size: %d\n",currentMatchc);
 
   /*
   int matchc =  edmonds(myQueue, 
