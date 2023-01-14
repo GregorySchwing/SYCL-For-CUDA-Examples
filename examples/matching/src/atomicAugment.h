@@ -725,6 +725,7 @@ void atomicAugment_b(sycl::queue &q,
                 // This is a matched dist 0 vertex.
                 auto acrossTheBridge = match_i[src];
                 auto mySideOfTheBridge = match_i[acrossTheBridge];
+                
 
             });
         };
