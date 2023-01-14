@@ -584,6 +584,10 @@ void atomicAugment_a(sycl::queue &q,
         printf("Augment iteration %d\n", iter++);
     } while(flag);
 
+    // Flip the edges in the augmenting path.
+
+
+
 /*
                             sycl::atomic_ref<uint64_t, sycl::memory_order::relaxed, sycl::memory_scope::device, 
                             sycl::access::address_space::global_space> ref_b_u(b_i[start_i[bridge_u]]);
@@ -713,6 +717,39 @@ void atomicAugment_a(sycl::queue &q,
     }
 
     return;
+}
+
+void atomicAugment_b(sycl::queue &q, 
+                int & matchCount,
+                sycl::buffer<int> &pred,
+                sycl::buffer<int> &dist,
+                sycl::buffer<int> &start,
+                sycl::buffer<int> &depth,
+                sycl::buffer<int> &match,
+                const int vertexNum){
+        const size_t numBlocks = vertexNum;
+        const sycl::range VertexSize{numBlocks};
+        // Command Group creation
+        auto cg2 = [&](sycl::handler &h) {    
+            const auto read_t = sycl::access::mode::read;
+            const auto write_t = sycl::access::mode::write;
+            const auto dwrite_t = sycl::access::mode::discard_write;
+            const auto read_write_t = sycl::access::mode::read_write;
+
+            auto pred_i = pred.get_access<read_t>(h);
+            auto dist_i = dist.get_access<read_t>(h);
+            auto start_i = start.get_access<read_t>(h);
+
+            auto match_i = match.get_access<read_write_t>(h);
+
+
+            h.parallel_for(VertexSize,
+                            [=](sycl::id<1> src) {                         
+            });
+        };
+        q.submit(cg2);
+
+
 }
 
 #endif
