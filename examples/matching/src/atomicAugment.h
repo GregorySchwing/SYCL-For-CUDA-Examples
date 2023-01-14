@@ -542,39 +542,41 @@ void atomicAugment_a(sycl::queue &q,
 
         //#ifdef NDEBUG
         {
-        const auto read_t = sycl::access::mode::read;
-        const auto read_write_t = sycl::access::mode::read_write;
+            const auto read_t = sycl::access::mode::read;
+            const auto read_write_t = sycl::access::mode::read_write;
+            const auto write_t = sycl::access::mode::write;
 
-        auto m = match.get_access<read_t>();
-        auto cs = colsum.get_access<read_write_t>();
-        cs[0] = 0;
-        cs[1] = 0;
-        cs[2] = 0;
-        const auto write_t = sycl::access::mode::write;
+            auto m = match.get_access<read_t>();
+            auto cs = colsum.get_access<read_write_t>();
+            auto cm_i = checkMatch.get_access<read_write_t>();
 
-        auto cm_i = checkMatch.get_access<write_t>();
-        validMatch = true;
-        for (int i = 0; i < vertexNum; i++) {
-            cm_i[i] = 0;
-        }
-        for (int i = 0; i < vertexNum; i++) {
-            if(m[i] < 4)
-                ++cs[m[i]];
-            else if(m[i] >= 4)
-                ++cm_i[i];
-            //printf("%d %d\n",i,m[i]);
-        }
-        std::cout << "red count : " << cs[0] << std::endl;
-        std::cout << "blue count : " << cs[1] << std::endl;
-        std::cout << "dead count : " << cs[2] << std::endl;
-        std::cout << "matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
+            cs[0] = 0;
+            cs[1] = 0;
+            cs[2] = 0;
 
-        for (int i = 0; i < vertexNum; i++) {
-            if(cm_i[i] > 1){
-                validMatch = false;
-                printf("Error %d is matched %d times\n", i, cm_i[i]);
+            validMatch = true;
+            for (int i = 0; i < vertexNum; i++) {
+                cm_i[i] = 0;
             }
-        }  
+            for (int i = 0; i < vertexNum; i++) {
+                if(m[i] < 4){
+                    ++cm_i[i];
+                    ++cs[m[i]];
+                } else if(m[i] >= 4)
+                    ++cm_i[m[i]-4];
+                //printf("%d %d\n",i,m[i]);
+            }
+            std::cout << "red count : " << cs[0] << std::endl;
+            std::cout << "blue count : " << cs[1] << std::endl;
+            std::cout << "dead count : " << cs[2] << std::endl;
+            std::cout << "matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
+
+            for (int i = 0; i < vertexNum; i++) {
+                if(cm_i[i] > 1){
+                    validMatch = false;
+                    printf("Error %d is matched %d times\n", i, cm_i[i]);
+                }
+            }  
         }
         //#endif
         // just to keep from entering an inf loop till all matching logic is done.
@@ -664,50 +666,49 @@ void atomicAugment_a(sycl::queue &q,
     }
     */
 
-    {
-        const auto write_t = sycl::access::mode::write;
-
-        auto cm_i = checkMatch.get_access<write_t>();
-
-        for (int i = 0; i < vertexNum; i++) {
-            cm_i[i] = 0;
-        }
-    }
-
     validMatch = true;
+
     {
         const auto read_t = sycl::access::mode::read;
         const auto read_write_t = sycl::access::mode::read_write;
+        const auto write_t = sycl::access::mode::write;
 
         auto m = match.get_access<read_t>();
         auto cs = colsum.get_access<read_write_t>();
         auto cm_i = checkMatch.get_access<read_write_t>();
+
         cs[0] = 0;
         cs[1] = 0;
         cs[2] = 0;
 
+        validMatch = true;
         for (int i = 0; i < vertexNum; i++) {
-            if(m[i] < 4)
-                ++cs[m[i]];
-            else if(m[i] >= 4)
-                ++cm_i[i];
+            cm_i[i] = 0;
         }
-        //#ifdef NDEBUG
+        for (int i = 0; i < vertexNum; i++) {
+            if(m[i] < 4){
+                ++cm_i[i];
+                ++cs[m[i]];
+            } else if(m[i] >= 4)
+                ++cm_i[m[i]-4];
+            //printf("%d %d\n",i,m[i]);
+        }
         std::cout << "red count : " << cs[0] << std::endl;
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
         std::cout << "matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
+
         for (int i = 0; i < vertexNum; i++) {
             if(cm_i[i] > 1){
                 validMatch = false;
                 printf("Error %d is matched %d times\n", i, cm_i[i]);
             }
         }  
-        //#endif
-        matchCount = vertexNum-(cs[0]+cs[1]+cs[2]);
     }
     if(validMatch){
         printf("Match 3 is valid\n");
+    } else {
+        printf("Match 3 is invalid\n");
     }
 
     return;
