@@ -13,8 +13,7 @@
 
 #include <boost/graph/max_cardinality_matching.hpp>
 #include "config.h"
- #include < chrono >
-
+#include <chrono>
 using namespace boost;
 
 typedef adjacency_list<vecS, vecS, undirectedS> my_graph; 
@@ -62,7 +61,7 @@ int main(int argc, char *argv[]) {
     // matching returned is not actually a maximum cardinality matching
     // in the graph.
 
-    chrono::time_point<std::chrono::system_clock> begin, end;
+    std::chrono::time_point<std::chrono::system_clock> begin, end;
 	std::chrono::duration<double> elapsed_seconds_max, elapsed_seconds_edge, elapsed_seconds_mvc;
 
     begin = std::chrono::system_clock::now(); 
