@@ -130,7 +130,6 @@ void atomicAugment_a(sycl::queue &q,
 
 
 
-    bool matchedADead = true;
     bool flag = false;
     int iter = 0;
     do{
@@ -141,6 +140,7 @@ void atomicAugment_a(sycl::queue &q,
         }
 
         //Initialize matchable srcs bool array.
+        //Sets src vertices that are eligible bridges to true.
         auto cg2 = [&](sycl::handler &h) {    
             const auto read_t = sycl::access::mode::read;
             const auto write_t = sycl::access::mode::write;
@@ -239,8 +239,8 @@ void atomicAugment_a(sycl::queue &q,
                 // if (i >= vertexNum) return;
 
                 // Only match the srcs of bridges which haven't been matched.
-                if (!matchable_i[i] && dist_i[i] == 0)
-                    match_i[i] = 2;
+                //if (!matchable_i[i] && dist_i[i] == 0)
+                //    match_i[i] = 2;
 
                 if (!matchable_i[i])
                     return; 
@@ -273,39 +273,7 @@ void atomicAugment_a(sycl::queue &q,
             });
         };
         q.submit(cg3);
-
-        int matched = 0;
-        {
-        const auto read_t = sycl::access::mode::read;
-        const auto read_write_t = sycl::access::mode::read_write;
-        auto matchable_i = matchable.get_access<read_t>();
-        auto m = match.get_access<read_t>();
-        auto cs = colsum.get_access<read_write_t>();
-        cs[0] = 0;
-        cs[1] = 0;
-        cs[2] = 0;
-
-        for (int i = 0; i < vertexNum; i++) {
-            if(matchable_i[i]){
-                //printf("ERROR TRYING TO MATCH A NONDEAD VERTEX %d color %d\n", i, m[i]);
-                ++cs[1];
-            }
-            if(m[i] == 2)
-                 ++cs[0];
-            if(m[i] < 2)
-                 ++cs[2];
-            if(m[i] >= 4)
-                ++matched;
-            //printf("%d %d\n",i,m[i]);
-        }
-        std::cout << "dead count : " << cs[0] << std::endl;
-        std::cout << "red/blue count : " << cs[2] << std::endl;
-        std::cout << "matchable count : " << cs[1] << std::endl;
-        std::cout << "matched count : " << matched/2 << std::endl;
-
-        }
-        fflush(stdout);
-
+        
         // Request atomically
         auto cg4 = [&](sycl::handler &h) {    
             const auto read_t = sycl::access::mode::read;
@@ -330,7 +298,8 @@ void atomicAugment_a(sycl::queue &q,
                                 size_t blockDim = ra[0];
                                 size_t threadIdx = item.get_local_id();
                                 auto srcStart = start_i[src];
-
+                                if (!matchable_i[srcStart])
+                                    return; 
                                 // I am blue
                                 if (match_i[srcStart] == 0){
 
@@ -348,10 +317,10 @@ void atomicAugment_a(sycl::queue &q,
                                         // prevents blossoms from claiming a stake
                                         // last condition  match_i[start_i[col]] < 4 lets me loop the augment
                                         if (srcLevel % 2 == 1 &&
-                                            srcMatch >= 4 &&
                                             dist_i[col] % 2 == 1 &&
-                                            match_i[col] >= 4 &&
+                                            srcMatch == match_i[col] &&
                                             srcStart != start_i[col] && 
+                                            match_i[srcStart] < 4 &&
                                             match_i[start_i[col]] < 4){
                                                 const auto colStart = start_i[col];
                                                 const auto nm = match_i[colStart];
@@ -370,8 +339,8 @@ void atomicAugment_a(sycl::queue &q,
                                         // the match tries to claim the SV.
                                         } else if (srcLevel % 2 == 0 &&
                                             dist_i[col] % 2 == 0 &&
-                                            srcMatch == match_i[col] &&
                                             srcStart != start_i[col] && 
+                                            match_i[srcStart] < 4 &&
                                             match_i[start_i[col]] < 4){
                                                 const auto colStart = start_i[col];
                                                 const auto nm = match_i[colStart];
@@ -400,6 +369,8 @@ void atomicAugment_a(sycl::queue &q,
             auto rows_i = rows.get_access<read_t>(h);
             auto cols_i = cols.get_access<read_t>(h);
             auto match_i = match.get_access<read_t>(h);
+            auto matchable_i = matchable.get_access<read_t>(h);
+
             auto b_i = bridgeVertex.get_access<read_t>(h);
             auto start_i = start.get_access<read_t>(h);
             auto requests_i = requests.get_access<write_t>(h);
@@ -415,7 +386,8 @@ void atomicAugment_a(sycl::queue &q,
                                 size_t blockDim = ra[0];
                                 size_t threadIdx = item.get_local_id();
                                 auto srcStart = start_i[src];
-
+                                if (!matchable_i[srcStart])
+                                    return; 
                                 // I am red
                                 if (match_i[srcStart] == 1){
 
@@ -434,11 +406,11 @@ void atomicAugment_a(sycl::queue &q,
                                         // prevents blossoms from claiming a stake
                                         // last condition  match_i[start_i[col]] < 4 lets me loop the augment
                                         if (srcLevel % 2 == 1 &&
-                                            srcMatch >= 4 &&
                                             dist_i[col] % 2 == 1 &&
-                                            match_i[col] >= 4 &&
-                                            srcStart != colStart && 
-                                            match_i[colStart] < 4){
+                                            srcMatch == match_i[col] &&
+                                            srcStart != start_i[col] && 
+                                            match_i[srcStart] < 4 &&
+                                            match_i[start_i[col]] < 4){
                                                 const auto nm = match_i[colStart];
                                                 if (nm == 0)
                                                 {
@@ -457,9 +429,9 @@ void atomicAugment_a(sycl::queue &q,
                                         // the match tries to claim the SV.
                                         } else if (srcLevel % 2 == 0 &&
                                             dist_i[col] % 2 == 0 &&
-                                            srcMatch == match_i[col] &&
-                                            srcStart != colStart && 
-                                            match_i[colStart] < 4){
+                                            srcStart != start_i[col] && 
+                                            match_i[srcStart] < 4 &&
+                                            match_i[start_i[col]] < 4){
 
                                                 const auto nm = match_i[colStart];
                                                 //Is this neighbour blue?
@@ -488,6 +460,7 @@ void atomicAugment_a(sycl::queue &q,
             const auto read_t = sycl::access::mode::read;
             const auto write_t = sycl::access::mode::write;
             const auto read_write_t = sycl::access::mode::read_write;
+            auto matchable_i = matchable.get_access<read_write_t>(h);
 
             auto match_i = match.get_access<read_write_t>(h);
             auto b_i = bridgeVertex.get_access<read_t>(h);
@@ -504,10 +477,8 @@ void atomicAugment_a(sycl::queue &q,
                                 size_t blockDim = ra[0];
                                 size_t threadIdx = item.get_local_id();
                                 auto srcStart = start_i[src];
-
-                                // This is necessarily to prevent from trying to match non-bridge srcs or already matched srcs
-                                if (match_i[srcStart]>=4)
-                                    return;
+                                if (!matchable_i[srcStart])
+                                    return; 
 
                                 const auto r = requests_i[srcStart];
 
@@ -517,6 +488,7 @@ void atomicAugment_a(sycl::queue &q,
                                     //Match the vertices if the request was mutual.
                                     // matched vertices point to each other.
                                     match_i[srcStart] = 4 + r;
+                                    matchable_i[srcStart] = false;
                                 }
                                    
                 
@@ -524,49 +496,21 @@ void atomicAugment_a(sycl::queue &q,
         };
         q.submit(cg6);
 
-
-
-        // Request vertices - one workitem per workgroup
         // Command Group creation
         auto cg7 = [&](sycl::handler &h) {    
-            const auto read_t = sycl::access::mode::read;
-            const auto write_t = sycl::access::mode::write;
-            const auto read_write_t = sycl::access::mode::read_write;
+            const auto dwrite_t = sycl::access::mode::discard_write;
 
-            auto match_i = match.get_access<read_t>(h);
-            auto b_i = bridgeVertex.get_access<read_write_t>(h);
-            auto start_i = start.get_access<read_t>(h);
-            auto requests_i = requests.get_access<read_t>(h);
-            auto matchable_i = matchable.get_access<write_t>(h);
+            auto b_i = bridgeVertex.get_access<dwrite_t>(h);
+            auto requests_i = requests.get_access<dwrite_t>(h);
+            auto matchable_i = matchable.get_access<dwrite_t>(h);
 
-
-            h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {                
-                            //Look at all blue vertices and let them make requests.
-                                //Look at all blue vertices and let them make requests.
-                                sycl::group<1> gr = item.get_group();
-                                sycl::range<1> ra = gr.get_local_range();
-                                sycl::range<1> numV = gr.get_group_range();
-                                size_t src = gr.get_group_linear_id();
-                                size_t blockDim = ra[0];
-                                size_t threadIdx = item.get_local_id();
-                                if (!matchable_i[src])
-                                    return;
-
-                                // Reset bridges, so bridges which were once eligible
-                                // will be ineligible next round.
-                                // i.e. x -> y <- z __ a
-                                // x matched y
-                                // y <- z is now inelibigle and now next round
-                                // x -> y __ z -> a 
-                                if (match_i[src]>=4 || requests_i[src] == -1)     
-                                    matchable_i[src] = false;
-                                
-                                
-                
-        });
+            h.parallel_for(VertexSize,
+                            [=](sycl::id<1> i) { 
+                                b_i[i] = 0; 
+                                requests_i[i] = -1;
+                                matchable_i[i] = false;});
         };
         q.submit(cg7);
-
 
 
         {
@@ -575,7 +519,7 @@ void atomicAugment_a(sycl::queue &q,
         flag = km[0];
         }
 
-        //#ifdef NDEBUG
+        #ifdef NDEBUG
         {
             const auto read_t = sycl::access::mode::read;
             const auto read_write_t = sycl::access::mode::read_write;
@@ -613,10 +557,8 @@ void atomicAugment_a(sycl::queue &q,
                 }
             }  
         }
-        //#endif
-        // just to keep from entering an inf loop till all matching logic is done.
-        //flag = km[0];
         printf("Augment iteration %d\n", iter++);
+        #endif
     } while(flag);
 
     // Flip the edges in the augmenting path.
