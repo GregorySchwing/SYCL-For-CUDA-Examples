@@ -204,6 +204,17 @@ int main(int argc, char *argv[]) {
     printf("\nElapsed Time for SYCL augment: %f\n",elapsed_seconds_max.count());
     printf("\nSYCL augment size: %d\n",currentMatchc/2);
 
+    atomicAugment_b(myQueue, 
+                currentMatchc,
+                rows, 
+                cols, 
+                start,
+                pred,
+                dist,
+                match,
+                bridgeVertex,
+                graph.vertexNum);
+
     /*
     // To identify one and only one Augmenting path 
     // to use the starting v.

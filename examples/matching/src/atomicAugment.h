@@ -696,17 +696,133 @@ void atomicAugment_a(sycl::queue &q,
     return;
 }
 
-
-// If my dist is 0 and I am matched, jump and augment.
+// As of this point, two free vertices have been paired.
+// I know a bridge exists that connects them, but I don't 
+// have one currently.
+// I'll reperform the initial kernel of augment_a, with
+// the extra condition that the bridge connects the two vertices.
 void atomicAugment_b(sycl::queue &q, 
                 int & matchCount,
+                sycl::buffer<uint32_t> &rows, 
+                sycl::buffer<uint32_t> &cols, 
+                sycl::buffer<int> &start,
                 sycl::buffer<int> &pred,
                 sycl::buffer<int> &dist,
                 sycl::buffer<int> &match,
+                sycl::buffer<uint64_t> &bridgeVertex,
                 const int vertexNum){
         const size_t numBlocks = vertexNum;
         const sycl::range VertexSize{numBlocks};
         // Command Group creation
+
+        const size_t threadsPerBlock = 32;
+        const size_t totalThreads = numBlocks * threadsPerBlock;
+
+        const sycl::range NumWorkItems{totalThreads};
+        const sycl::range WorkGroupSize{threadsPerBlock};
+
+        //Sets src vertices that are eligible bridges to true.
+        auto cg2 = [&](sycl::handler &h) {    
+            const auto read_t = sycl::access::mode::read;
+            const auto write_t = sycl::access::mode::write;
+            const auto read_write_t = sycl::access::mode::read_write;
+
+            auto rows_i = rows.get_access<read_t>(h);
+            auto cols_i = cols.get_access<read_t>(h);
+            auto match_i = match.get_access<read_t>(h);
+
+            auto dist_i = dist.get_access<read_t>(h);
+            auto start_i = start.get_access<read_t>(h);
+            auto b_i = bridgeVertex.get_access<write_t>(h);
+
+            h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
+            //h.parallel_for(VertexSize,[=](sycl::id<1> src) {                         
+                                sycl::group<1> gr = item.get_group();
+                                sycl::range<1> ra = gr.get_local_range();
+                                sycl::range<1> numV = gr.get_group_range();
+                                size_t src = gr.get_group_linear_id();
+                                size_t blockDim = ra[0];
+                                size_t threadIdx = item.get_local_id();
+                                auto srcStart = start_i[src];
+
+                                auto srcLevel = dist_i[src];
+                                auto srcMatch = match_i[src];
+
+                                for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
+
+                                    auto col = cols_i[col_index];
+
+                                    // TODO HANDLE TRIVIALS BEFORE BRIDGES.
+                                    //matchable_i[srcStart] = true;
+                                    // Odd level aug-path
+                                    // (start_i[i] != start_i[auxMatch_i[i]])
+                                    // prevents blossoms from claiming a stake
+                                    // last condition  match_i[start_i[col]] < 4 lets me loop the augment
+                                    if (srcLevel % 2 == 1 &&
+                                                dist_i[col] % 2 == 1 &&
+                                                srcMatch == match_i[col] &&
+                                                srcStart != start_i[col] && 
+                                                match_i[srcStart] == match_i[start_i[col]]){
+                                        // It doesnt really matter which bridge wins as long as
+                                        // for two bridges (u,v) & (a,b) sharing a (src,dest)
+                                        // We dont augment (u,b) or (a,v).
+                                        // So i'll race for the src position in edgePairs.
+                                        // Then I'll only augment if I'm the smaller of the
+                                        // two sources.
+                                        // This prevents races of this type since only min(src,dest) will be written to.
+                                        if (srcStart < start_i[col]){
+                                            uint32_t leastSignificantWord = src;
+                                            uint32_t mostSignificantWord = col;
+                                            uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
+                                            b_i[src] = edgePair;
+                                        }
+                                    // Even level aug-path
+                                    // (start_i[i] != start_i[auxMatch_i[i]])
+                                    // prevents blossoms from claiming a stake
+                                    // i < match_i[i]  ensures only 1 vertex from
+                                    // the match tries to claim the SV.
+                                    } else if (srcLevel % 2 == 0 &&
+                                            dist_i[col] % 2 == 0 &&
+                                            srcStart != start_i[col]  && 
+                                            match_i[srcStart] == match_i[start_i[col]]){                                        
+                                        // It doesnt really matter which bridge wins as long as
+                                        // for two bridges (u,v) & (a,b) sharing a (src,dest)
+                                        // We dont augment (u,b) or (a,v).
+                                        // So i'll race for the src position in edgePairs.
+                                        // Then I'll only augment if I'm the smaller of the
+                                        // two sources.
+                                        // This prevents races of this type since only min(src,dest) will be written to.
+                                        // In next kernel i just check if b_i[src]!=0
+                                        if (srcStart < start_i[col]){
+                                            uint32_t leastSignificantWord = src;
+                                            uint32_t mostSignificantWord = col;
+                                            uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
+                                            b_i[src] = edgePair;
+                                        }
+                                    }
+                                }
+            });
+        };
+        q.submit(cg2);
+
+
+
+        {
+            const auto read_t = sycl::access::mode::read;
+            const auto read_write_t = sycl::access::mode::read_write;
+            const auto write_t = sycl::access::mode::write;
+
+            auto match_i = match.get_access<read_t>();
+            auto dist_i = dist.get_access<read_write_t>();
+
+            for (int i = 0; i < vertexNum; i++) {
+                if (dist_i[i] > 0 || match_i[i]<4) 
+                    continue;
+                printf("src %d srStartMatchedTo %d matchOfSSM %d\n", i, match_i[i]-4, match_i[match_i[i]-4]-4);
+            }
+        }
+
+        /*
         auto cg2 = [&](sycl::handler &h) {    
             const auto read_t = sycl::access::mode::read;
             const auto write_t = sycl::access::mode::write;
@@ -715,22 +831,23 @@ void atomicAugment_b(sycl::queue &q,
 
             auto pred_i = pred.get_access<read_t>(h);
             auto dist_i = dist.get_access<read_t>(h);
+            auto start_i = start.get_access<read_t>(h);
             auto match_i = match.get_access<read_write_t>(h);
 
             h.parallel_for(VertexSize,
                             [=](sycl::id<1> src) {   
                 if (dist_i[src] > 0 || match_i[src]<4) 
                     return;      
-
                 // This is a matched dist 0 vertex.
-                auto acrossTheBridge = match_i[src];
-                auto mySideOfTheBridge = match_i[acrossTheBridge];
-                
+                auto acrossTheBridge = match_i[src]-4;
+                auto mySideOfTheBridge = match_i[acrossTheBridge]-4;
+                //printf("src %d srcStart %d srStartMatchedTo %d matchOfSSM %d\n", src[0], acrossTheBridge, mySideOfTheBridge);
+                printf("src %u dead var %u srcStart %d srStartMatchedTo %d matchOfSSM %d\n", src[0], start_i[src], start_i[src], acrossTheBridge, mySideOfTheBridge);
 
             });
         };
         q.submit(cg2);
-
+        */
 
 }
 
