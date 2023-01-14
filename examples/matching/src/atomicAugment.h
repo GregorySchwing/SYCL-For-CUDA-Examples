@@ -76,6 +76,8 @@ void atomicAugment_a(sycl::queue &q,
     const sycl::range WorkGroupSize{threadsPerBlock};
     sycl::nd_range<1> test{NumWorkItems, WorkGroupSize};
 
+    sycl::buffer<int> checkMatch{VertexSize};
+    bool validMatch = true;
 
     // Initialize input data
     {
@@ -548,16 +550,31 @@ void atomicAugment_a(sycl::queue &q,
         cs[0] = 0;
         cs[1] = 0;
         cs[2] = 0;
+        const auto write_t = sycl::access::mode::write;
 
+        auto cm_i = checkMatch.get_access<write_t>();
+        validMatch = true;
+        for (int i = 0; i < vertexNum; i++) {
+            cm_i[i] = 0;
+        }
         for (int i = 0; i < vertexNum; i++) {
             if(m[i] < 4)
-            ++cs[m[i]];
+                ++cs[m[i]];
+            else if(m[i] >= 4)
+                ++cm_i[i];
             //printf("%d %d\n",i,m[i]);
         }
         std::cout << "red count : " << cs[0] << std::endl;
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
         std::cout << "matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
+
+        for (int i = 0; i < vertexNum; i++) {
+            if(cm_i[i] > 1){
+                validMatch = false;
+                printf("Error %d is matched %d times\n", i, cm_i[i]);
+            }
+        }  
         }
         //#endif
         // just to keep from entering an inf loop till all matching logic is done.
@@ -646,7 +663,6 @@ void atomicAugment_a(sycl::queue &q,
         }
     }
     */
-    sycl::buffer<int> checkMatch{VertexSize};
 
     {
         const auto write_t = sycl::access::mode::write;
@@ -658,7 +674,7 @@ void atomicAugment_a(sycl::queue &q,
         }
     }
 
-    bool validMatch = true;
+    validMatch = true;
     {
         const auto read_t = sycl::access::mode::read;
         const auto read_write_t = sycl::access::mode::read_write;
