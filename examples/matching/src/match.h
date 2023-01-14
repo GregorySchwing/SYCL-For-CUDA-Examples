@@ -676,7 +676,7 @@ void maximalMatchingNDItem(sycl::queue &q,
             else if(m[i] >= 4)
                 ++cm_i[i];
         }
-        #ifdef NDEBUG
+        //#ifdef NDEBUG
         std::cout << "red count : " << cs[0] << std::endl;
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
@@ -687,7 +687,7 @@ void maximalMatchingNDItem(sycl::queue &q,
                 printf("Error %d is matched %d times\n", i, cm_i[i]);
             }
         }  
-        #endif
+        //#endif
         syclinitmatchc = vertexNum-(cs[0]+cs[1]+cs[2]);
 
     }

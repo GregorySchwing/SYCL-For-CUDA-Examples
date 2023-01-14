@@ -61,10 +61,14 @@ int main(int argc, char *argv[]) {
     // version, but has the advantage that it will return "false" if the
     // matching returned is not actually a maximum cardinality matching
     // in the graph.
-
+    chrono::time_point<std::chrono::system_clock> mcm_begin, mcm_end;
+    augment_begin = std::chrono::system_clock::now(); 
     bool success = checked_edmonds_maximum_cardinality_matching(g, &mate[0]);
     assert(success);
-
+    mcm_end = std::chrono::system_clock::now(); 
+    elapsed_seconds_max = mcm_end - mcm_begin; 
+    printf("\nElapsed Time for Boost MCM: %f\n",elapsed_seconds_max.count());
+    printf("\nBoost MCM size: %d\n",matching_size(g, &mate[0]));
     std::cout << std::endl << "Found a matching of size " << matching_size(g, &mate[0]) << std::endl;
 
     return 0;

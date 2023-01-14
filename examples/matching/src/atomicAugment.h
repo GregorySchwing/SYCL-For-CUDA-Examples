@@ -239,8 +239,8 @@ void atomicAugment_a(sycl::queue &q,
                 // if (i >= vertexNum) return;
 
                 // Only match the srcs of bridges which haven't been matched.
-                //if (!matchable_i[i] && dist_i[i] == 0)
-                //    match_i[i] = 2;
+                if (!matchable_i[i] && dist_i[i] == 0 && match_i[i] < 4)
+                    match_i[i] = 2;
 
                 if (!matchable_i[i])
                     return; 
