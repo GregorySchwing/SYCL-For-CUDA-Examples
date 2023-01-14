@@ -696,12 +696,12 @@ void atomicAugment_a(sycl::queue &q,
     return;
 }
 
+
+// If my dist is 0 and I am matched, jump and augment.
 void atomicAugment_b(sycl::queue &q, 
                 int & matchCount,
                 sycl::buffer<int> &pred,
                 sycl::buffer<int> &dist,
-                sycl::buffer<int> &start,
-                sycl::buffer<int> &depth,
                 sycl::buffer<int> &match,
                 const int vertexNum){
         const size_t numBlocks = vertexNum;
@@ -715,13 +715,17 @@ void atomicAugment_b(sycl::queue &q,
 
             auto pred_i = pred.get_access<read_t>(h);
             auto dist_i = dist.get_access<read_t>(h);
-            auto start_i = start.get_access<read_t>(h);
-
             auto match_i = match.get_access<read_write_t>(h);
 
-
             h.parallel_for(VertexSize,
-                            [=](sycl::id<1> src) {                         
+                            [=](sycl::id<1> src) {   
+                if (dist_i[src] > 0 || match_i[src]<4) 
+                    return;      
+
+                // This is a matched dist 0 vertex.
+                auto acrossTheBridge = match_i[src];
+                auto mySideOfTheBridge = match_i[acrossTheBridge];
+
             });
         };
         q.submit(cg2);
