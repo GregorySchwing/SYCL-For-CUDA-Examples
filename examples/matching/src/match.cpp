@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
 	elapsed_seconds_max = initial_match_end - initial_match_begin; 
 
   printf("\nElapsed Time for SYCL Initial Max Match: %f\n",elapsed_seconds_max.count());
-  printf("SYCL initial match count is: %u\n", syclinitmatchc);
+  printf("SYCL initial match count is: %u\n", syclinitmatchc/2);
 
   chrono::time_point<std::chrono::system_clock> nd_item_initial_match_begin, nd_item_initial_match_end;
   nd_item_initial_match_begin = std::chrono::system_clock::now(); 
@@ -138,7 +138,7 @@ int main(int argc, char *argv[]) {
 	elapsed_seconds_max = nd_item_initial_match_end - nd_item_initial_match_begin; 
 
   printf("\nElapsed Time for SYCL NDItem Initial Max Match: %f\n",elapsed_seconds_max.count());
-  printf("SYCL initial match count is: %u\n", nditem_syclinitmatchc);
+  printf("SYCL initial match count is: %u\n", nditem_syclinitmatchc/2);
 
   // These arrays are uncompromising.
   sycl::buffer<int> dist{VertexSize};
@@ -161,7 +161,7 @@ int main(int argc, char *argv[]) {
   sycl::buffer<int> start{VertexSize};
   int currentMatchc = 0, prevMatchc = 0, iteration = 0;
   currentMatchc = nditem_syclinitmatchc;
-  do {
+  //do {
     prevMatchc = currentMatchc;
     // This kernel is fine as is for use in a search tree. 
     // Each subkernel should be logically kernelized by available
@@ -202,7 +202,7 @@ int main(int argc, char *argv[]) {
     augment_end = std::chrono::system_clock::now(); 
     elapsed_seconds_max = augment_end - augment_begin; 
     printf("\nElapsed Time for SYCL augment: %f\n",elapsed_seconds_max.count());
-    printf("\nSYCL augment size: %d\n",currentMatchc);
+    printf("\nSYCL augment size: %d\n",currentMatchc/2);
 
     /*
     // To identify one and only one Augmenting path 
@@ -259,7 +259,7 @@ int main(int argc, char *argv[]) {
     printf("\nElapsed Time for SYCL augment: %f\n",elapsed_seconds_max.count());
     */
     printf("\nIteration %d\n",iteration++);
-  } while (prevMatchc != currentMatchc); 
+  //} while (prevMatchc != currentMatchc); 
 
     
 
@@ -320,7 +320,7 @@ int main(int argc, char *argv[]) {
 	elapsed_seconds_max = end - begin; 
 
   printf("\nElapsed Time for SYCL Max Match: %f\n",elapsed_seconds_max.count());
-  printf("SYCL match count is: %u\n", currentMatchc);
+  printf("SYCL match count is: %u\n", currentMatchc/2);
   fflush(stdout);
   // Test matching against serial edmonds
   begin = std::chrono::system_clock::now(); 
@@ -330,6 +330,6 @@ int main(int argc, char *argv[]) {
 	elapsed_seconds_max = end - begin; 
   // matchc is number of matched edges
   printf("\nElapsed Time for Serial edmonds Max Match: %f\n",elapsed_seconds_max.count());
-  printf("Serial max matching count : %d\n", 2*matchc);
+  printf("Serial max matching count : %d\n", matchc);
   return 0;
 }

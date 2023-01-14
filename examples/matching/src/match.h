@@ -270,7 +270,7 @@ void maximalMatching(sycl::queue &q,
         std::cout << "red count : " << cs[0] << std::endl;
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
-        std::cout << "matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
+        std::cout << "matched count : " << (vertexNum-(cs[0]+cs[1]+cs[2]))/2 << std::endl;
         }
         #endif
         // just to keep from entering an inf loop till all matching logic is done.
@@ -313,7 +313,7 @@ void maximalMatching(sycl::queue &q,
         std::cout << "red count : " << cs[0] << std::endl;
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
-        std::cout << "matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
+        std::cout << "matched count : " << (vertexNum-(cs[0]+cs[1]+cs[2]))/2 << std::endl;
         for (int i = 0; i < vertexNum; i++) {
             if(cm_i[i] > 1){
                 validMatch = false;
@@ -637,7 +637,7 @@ void maximalMatchingNDItem(sycl::queue &q,
         std::cout << "red count : " << cs[0] << std::endl;
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
-        std::cout << "matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
+        std::cout << "matched count : " << (vertexNum-(cs[0]+cs[1]+cs[2]))/2 << std::endl;
         }
         #endif
         // just to keep from entering an inf loop till all matching logic is done.
@@ -680,7 +680,7 @@ void maximalMatchingNDItem(sycl::queue &q,
         std::cout << "red count : " << cs[0] << std::endl;
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
-        std::cout << "matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
+        std::cout << "matched count : " << (vertexNum-(cs[0]+cs[1]+cs[2]))/2 << std::endl;
         for (int i = 0; i < vertexNum; i++) {
             if(cm_i[i] > 1){
                 validMatch = false;

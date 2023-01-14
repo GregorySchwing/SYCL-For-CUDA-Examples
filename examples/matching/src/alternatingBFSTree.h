@@ -44,14 +44,19 @@ void alternatingBFSTree(sycl::queue &q,
 
   // Expanded
   sycl::buffer<bool> expanded{Singleton};
+  sycl::buffer<int> dzs{Singleton};
+
 
 
   // Initialize input data
   {
     const auto read_t = sycl::access::mode::read;
+    const auto write_t = sycl::access::mode::write;
     const auto dwrite_t = sycl::access::mode::discard_write;
     const auto read_write_t = sycl::access::mode::read_write;
     auto deg = degree.get_access<read_t>();
+    auto dzs_i = dzs.get_access<read_write_t>();
+
 
     auto m = match.get_access<read_t>();
     auto d = dist.get_access<dwrite_t>();    
@@ -60,7 +65,10 @@ void alternatingBFSTree(sycl::queue &q,
 
     auto dep = depth.get_access<dwrite_t>();
     auto exp = expanded.get_access<dwrite_t>();
+    dzs_i[0] = 0;
     for (int i = 0; i < vertexNum; i++) {
+      if (!deg[i])
+        ++dzs_i[0];
       if (m[i] < 4){
         d[i] = 0;
       } else {
@@ -71,6 +79,7 @@ void alternatingBFSTree(sycl::queue &q,
     }
     dep[0] = -1;
     exp[0] = 0;
+    printf("Num degree zero vertices %d\n", dzs_i[0]);
   }
 
   const size_t numBlocks = vertexNum;
@@ -183,25 +192,32 @@ void alternatingBFSTree(sycl::queue &q,
     }
   } while(flag);
 
-  #ifdef NDEBUG
+  //#ifdef NDEBUG
   {
     const auto read_t = sycl::access::mode::read;
     auto d = dist.get_access<read_t>();
     auto s = start.get_access<read_t>();
     auto dep = depth.get_access<read_t>();
-
+    #ifdef NDEBUG
     std::cout << "Distance from start is : " << std::endl;
     for (int depth_to_print = 0; depth_to_print <= dep[0]; depth_to_print++) {
       for (int i = 0; i < vertexNum; i++) {
         if (d[i] == depth_to_print) printf("vertex %d dist %d start %d\n",i, d[i], s[i]);
       }
     }
+    #endif
+    const auto read_write_t = sycl::access::mode::read_write;
+    auto dzs_i = dzs.get_access<read_write_t>();
+
+    dzs_i[0] = 0;
     for (int i = 0; i < vertexNum; i++) {
       if (d[i] > dep[0]) printf("Error: vertex %d dist %d start %d\n",i, d[i], s[i]);
+      if (!d[i])++dzs_i[0];
     }
     std::cout << std::endl;
+    std::cout << "Number zero dist vertices is : " << dzs_i[0] << std::endl;
   }
-  #endif
+  //#endif
 
   return;
 }

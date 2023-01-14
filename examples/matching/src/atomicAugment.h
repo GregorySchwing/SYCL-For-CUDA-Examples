@@ -130,7 +130,7 @@ void atomicAugment_a(sycl::queue &q,
 
 
 
-
+    bool matchedADead = true;
     bool flag = false;
     int iter = 0;
     do{
@@ -180,16 +180,17 @@ void atomicAugment_a(sycl::queue &q,
                                     if (srcLevel % 2 == 1 &&
                                         srcMatch < 4)
                                     {   
-                                        matchable_i[srcStart] = true;
+                                        // TODO HANDLE TRIVIALS BEFORE BRIDGES.
+                                        //matchable_i[srcStart] = true;
                                     // Odd level aug-path
                                     // (start_i[i] != start_i[auxMatch_i[i]])
                                     // prevents blossoms from claiming a stake
                                     // last condition  match_i[start_i[col]] < 4 lets me loop the augment
                                     } else if (srcLevel % 2 == 1 &&
-                                                srcMatch >= 4 &&
                                                 dist_i[col] % 2 == 1 &&
-                                                match_i[col] >= 4 &&
+                                                srcMatch == match_i[col] &&
                                                 srcStart != start_i[col] && 
+                                                match_i[srcStart] < 4 &&
                                                 match_i[start_i[col]] < 4){
                                         matchable_i[srcStart] = true;
 
@@ -200,10 +201,10 @@ void atomicAugment_a(sycl::queue &q,
                                     // the match tries to claim the SV.
                                     } else if (srcLevel % 2 == 0 &&
                                             dist_i[col] % 2 == 0 &&
-                                            srcMatch == match_i[col] &&
                                             srcStart != start_i[col] && 
-                                            match_i[start_i[col]] < 4){
-                                        matchable_i[srcStart] = true;
+                                            match_i[srcStart] < 4 &&
+                                            match_i[start_i[col]] < 4){                                        
+                                                matchable_i[srcStart] = true;
                                     }
                                 }
             });
@@ -231,16 +232,18 @@ void atomicAugment_a(sycl::queue &q,
             auto requests_i = requests.get_access<write_t>(h);
             auto match_i = match.get_access<read_write_t>(h);
             auto km = keepMatching.get_access<write_t>(h);
-
+            auto dist_i = dist.get_access<read_t>(h);
             h.parallel_for(VertexSize,
                             [=](sycl::id<1> i) { 
                 // Unnecessary
                 // if (i >= vertexNum) return;
 
                 // Only match the srcs of bridges which haven't been matched.
+                if (!matchable_i[i] && dist_i[i] == 0)
+                    match_i[i] = 2;
+
                 if (!matchable_i[i])
-                    return;
-                
+                    return; 
                 // cant be type dwrite_t (must be write_t) or this is always reacher somehow.
                 km[0] = true;
                 // Some vertices can still match.
@@ -270,6 +273,38 @@ void atomicAugment_a(sycl::queue &q,
             });
         };
         q.submit(cg3);
+
+        int matched = 0;
+        {
+        const auto read_t = sycl::access::mode::read;
+        const auto read_write_t = sycl::access::mode::read_write;
+        auto matchable_i = matchable.get_access<read_t>();
+        auto m = match.get_access<read_t>();
+        auto cs = colsum.get_access<read_write_t>();
+        cs[0] = 0;
+        cs[1] = 0;
+        cs[2] = 0;
+
+        for (int i = 0; i < vertexNum; i++) {
+            if(matchable_i[i]){
+                //printf("ERROR TRYING TO MATCH A NONDEAD VERTEX %d color %d\n", i, m[i]);
+                ++cs[1];
+            }
+            if(m[i] == 2)
+                 ++cs[0];
+            if(m[i] < 2)
+                 ++cs[2];
+            if(m[i] >= 4)
+                ++matched;
+            //printf("%d %d\n",i,m[i]);
+        }
+        std::cout << "dead count : " << cs[0] << std::endl;
+        std::cout << "red/blue count : " << cs[2] << std::endl;
+        std::cout << "matchable count : " << cs[1] << std::endl;
+        std::cout << "matched count : " << matched/2 << std::endl;
+
+        }
+        fflush(stdout);
 
         // Request atomically
         auto cg4 = [&](sycl::handler &h) {    
@@ -569,7 +604,7 @@ void atomicAugment_a(sycl::queue &q,
             std::cout << "red count : " << cs[0] << std::endl;
             std::cout << "blue count : " << cs[1] << std::endl;
             std::cout << "dead count : " << cs[2] << std::endl;
-            std::cout << "matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
+            std::cout << "matched count : " << (vertexNum-(cs[0]+cs[1]+cs[2]))/2 << std::endl;
 
             for (int i = 0; i < vertexNum; i++) {
                 if(cm_i[i] > 1){
@@ -580,7 +615,7 @@ void atomicAugment_a(sycl::queue &q,
         }
         //#endif
         // just to keep from entering an inf loop till all matching logic is done.
-        //flag = false;
+        //flag = km[0];
         printf("Augment iteration %d\n", iter++);
     } while(flag);
 
@@ -700,7 +735,7 @@ void atomicAugment_a(sycl::queue &q,
         std::cout << "red count : " << cs[0] << std::endl;
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
-        std::cout << "matched count : " << vertexNum-(cs[0]+cs[1]+cs[2]) << std::endl;
+        std::cout << "matched count : " << (vertexNum-(cs[0]+cs[1]+cs[2]))/2 << std::endl;
         matchCount = vertexNum-(cs[0]+cs[1]+cs[2]);
 
         for (int i = 0; i < vertexNum; i++) {
