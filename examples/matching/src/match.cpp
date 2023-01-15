@@ -193,7 +193,6 @@ int main(int argc, char *argv[]) {
                       dist,
                       pred,
                       start,
-                      depth,
                       degree,
                       match,
                       requests,

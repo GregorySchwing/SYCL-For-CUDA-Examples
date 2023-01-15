@@ -431,7 +431,7 @@ void setBlockDimAndUseGlobalMemory(Config &config, CSRGraph graph, int maxShared
 		}
 	}
 
-	printf("\nOptimal BlockDim : %d\n", optimalBlockDim);
+	//printf("\nOptimal BlockDim : %d\n", optimalBlockDim);
 	fflush(stdout);
 	if (config.blockDim == 0)
 	{

@@ -86,6 +86,7 @@ void augment_a(sycl::queue &q,
     }
 
     bool flag = false;
+    int iteration = 0;
     do{
         {
         const auto write_t = sycl::access::mode::write;
@@ -131,9 +132,11 @@ void augment_a(sycl::queue &q,
                             size_t blockDim = r[0];
                             size_t threadIdx = item.get_local_id();
                             
-                            // Not a new frontier vertex
-                            if (dist_i[src] != depth_i[0]+1  || match_i[src] >= 4) return;
+                            printf("src %lu dist %d depth %d start %d\n", src, dist_i[src], depth_i[0], start_i[src]);
 
+                            // Not a new frontier vertex
+                            if (dist_i[src] != (depth_i[0]+1)  || match_i[start_i[src]] >= 4) return;
+                            printf("possible to color the src in %lu\n", src);
                             // If you win the first race, you make sure you get written in your slot then return.
                             //sycl::atomic_ref<uint64_t, sycl::memory_order::relaxed, sycl::memory_scope::device, 
                             //sycl::access::address_space::global_space> ref_b_src(b_i[start_i[src]]);
@@ -494,10 +497,11 @@ void augment_a(sycl::queue &q,
         flag = km[0];
         }
 
-        #ifdef NDEBUG
+        //#ifdef NDEBUG
         {
         const auto read_t = sycl::access::mode::read;
         const auto read_write_t = sycl::access::mode::read_write;
+        auto depth_i = depth.get_access<read_t>();
 
         auto m = match.get_access<read_t>();
         auto cs = colsum.get_access<read_write_t>();
@@ -514,11 +518,13 @@ void augment_a(sycl::queue &q,
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
         std::cout << "matched count : " << (vertexNum-(cs[0]+cs[1]+cs[2]))/2 << std::endl;
+
+        printf("Iteration %d depth %d\n", iteration++, depth_i[0]+1);
+
         }
-        #endif
+        //#endif
         // just to keep from entering an inf loop till all matching logic is done.
         //flag = false;
-
     } while(flag);
 
     
@@ -564,11 +570,11 @@ void augment_a(sycl::queue &q,
             }
         }  
         //#endif
-        matchCount = vertexNum-(cs[0]+cs[1]+cs[2]);
+        matchCount = (vertexNum-(cs[0]+cs[1]+cs[2]))/2;
 
     }
     if(validMatch){
-        printf("Match 1 is valid\n");
+        printf("post augment match is valid\n");
     }
     return;
 }

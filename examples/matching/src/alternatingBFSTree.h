@@ -236,7 +236,6 @@ void alternatingBFSTree(sycl::queue &q,
                 sycl::buffer<int> &dist,
                 sycl::buffer<int> &pred,
                 sycl::buffer<int> &start,
-                sycl::buffer<int> &depth,
                 sycl::buffer<int> &degree,
                 sycl::buffer<int> &match,
                 sycl::buffer<int> &requests,
@@ -259,7 +258,7 @@ void alternatingBFSTree(sycl::queue &q,
   // Expanded
   sycl::buffer<bool> expanded{Singleton};
   sycl::buffer<int> dzs{Singleton};
-
+  sycl::buffer<int> depth{Singleton};
 
 
   // Initialize input data
@@ -306,7 +305,6 @@ void alternatingBFSTree(sycl::queue &q,
     {
       const auto write_t = sycl::access::mode::write;
       auto exp = expanded.get_access<write_t>();
-
       exp[0] = false;
     }
 
@@ -365,7 +363,8 @@ void alternatingBFSTree(sycl::queue &q,
                         //printf("hellow from item %lu thread %lu gr %lu w range %lu \n", item.get_global_linear_id(), threadIdx, src, r[0]);
                         
                         // Not a frontier vertex
-                        if (dist_i[src] != depth_i[0]  || match_i[src] >= 4) return;
+                        if (dist_i[src] != depth_i[0]) return;
+
                         if (depth_i[0] % 2 == 0){
                           for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
                             auto col = cols_i[col_index];
@@ -395,18 +394,24 @@ void alternatingBFSTree(sycl::queue &q,
     // check for bridges.  Terminate a frontier prematurely if one is found.
     // A bridge is an unmatched edge between two even levels
     // or a matched edge between two odd levels.
-    augment_a(q, 
-            matchCount,
-            rows, 
-            cols, 
-            pred,
-            dist,
-            start,
-            depth,
-            match,
-            requests,
-            matchable,
-            vertexNum);
+
+    {
+      const auto read_t = sycl::access::mode::read;
+      auto depth_i = depth.get_access<read_t>();
+      if(depth_i[0]>0)
+          augment_a(q, 
+              matchCount,
+              rows, 
+              cols, 
+              pred,
+              dist,
+              start,
+              depth,
+              match,
+              requests,
+              matchable,
+              vertexNum);
+    }
 
 
 
