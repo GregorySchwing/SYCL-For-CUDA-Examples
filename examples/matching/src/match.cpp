@@ -159,6 +159,11 @@ int main(int argc, char *argv[]) {
   // augmenting paths don't share a start -> blossom
   // This isn't strictly neccessary since we can bt.
   sycl::buffer<int> start{VertexSize};
+
+  // For the augmenting methods
+  sycl::buffer<bool> matchable{VertexSize};
+
+
   int currentMatchc = 0, prevMatchc = 0, iteration = 0;
   currentMatchc = nditem_syclinitmatchc;
   do {

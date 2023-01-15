@@ -141,15 +141,15 @@ void maximalMatching(sycl::queue &q,
                                 //Do we have an unmatched neighbour?
                                 if (nm < 4)
                                 {
-                                //Is this neighbour red?
-                                if (nm == 1)
-                                {
-                                    //Propose to this neighbour.
-                                    requests_i[src] = col;
-                                    return;
-                                }
-                                
-                                dead = 0;
+                                    //Is this neighbour red?
+                                    if (nm == 1)
+                                    {
+                                        //Propose to this neighbour.
+                                        requests_i[src] = col;
+                                        return;
+                                    }
+                                    
+                                    dead = 0;
                                 }
                             }
 
