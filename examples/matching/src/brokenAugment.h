@@ -147,10 +147,12 @@ void augment_a(sycl::queue &q,
                                 // An edge to a vertex in my even level.
                                 if (dist_i[col] == dist_i[src]){
                                     // If you win the first race, you make sure you get written in your slot then return.      
-                                    // If you win the first race, you make sure you get written in your slot then return.      
-                                    matchable_i[start_i[src]] = true;
-                                    matchable_i[src] = true;
-                                    return;
+                                    // If you win the first race, you make sure you get written in your slot then return. 
+                                    if (match_i[start_i[col]] < 4){   
+                                        matchable_i[start_i[src]] = true;
+                                        matchable_i[src] = true;
+                                        return;
+                                    }
                                 }
                             }
                             } else {
@@ -161,9 +163,11 @@ void augment_a(sycl::queue &q,
                                 if (match_i[col] == match_i[src] &&
                                     dist_i[col] == dist_i[src]){
                                     // If you win the first race, you make sure you get written in your slot then return.      
-                                    matchable_i[start_i[src]] = true;
-                                    matchable_i[src] = true;
-                                    return;
+                                    if (match_i[start_i[col]] < 4){   
+                                        matchable_i[start_i[src]] = true;
+                                        matchable_i[src] = true;
+                                        return;
+                                    }
                                 }
                             }
                             }       
@@ -199,7 +203,7 @@ void augment_a(sycl::queue &q,
                 // if (i >= vertexNum) return;
 
                 //The dest 0 vertices are colored red/blue
-                if (!matchable_i[i] || dist_i[i] != 0) return;
+                if (!matchable_i[i] || dist_i[i] != 0 || match_i[i] >= 4) return;
 
                 // cant be type dwrite_t (must be write_t) or this is always reacher somehow.
                 km[0] = true;
