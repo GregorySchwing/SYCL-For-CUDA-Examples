@@ -26,7 +26,7 @@
 #include <vector>
 #include <CL/sycl.hpp>
 
-#include "brokenAugment.h"
+#include "lockFreeAugment.h"
 
 // Frontier level synchronization w pred
 void alternatingBFSTree(sycl::queue &q, 
