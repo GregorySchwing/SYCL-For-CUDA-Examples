@@ -166,7 +166,7 @@ int main(int argc, char *argv[]) {
 
   int currentMatchc = 0, prevMatchc = 0, iteration = 0;
   currentMatchc = nditem_syclinitmatchc;
-  do {
+  //do {
     prevMatchc = currentMatchc;
     // This kernel is fine as is for use in a search tree. 
     // Each subkernel should be logically kernelized by available
@@ -302,8 +302,8 @@ int main(int argc, char *argv[]) {
     elapsed_seconds_max = augment_end - augment_begin; 
     printf("\nElapsed Time for SYCL augment: %f\n",elapsed_seconds_max.count());
     */
-    printf("\nIteration %d\n",iteration++);
-  } while (prevMatchc != currentMatchc); 
+    //printf("\nIteration %d\n",iteration++);
+  //} while (prevMatchc != currentMatchc); 
 
     
 
