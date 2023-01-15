@@ -279,6 +279,8 @@ void alternatingBFSTree(sycl::queue &q,
 
     auto dep = depth.get_access<dwrite_t>();
     auto exp = expanded.get_access<dwrite_t>();
+    auto b_i = bridgeVertex.get_access<dwrite_t>();
+    
     dzs_i[0] = 0;
     for (int i = 0; i < vertexNum; i++) {
       if (!deg[i])
@@ -288,6 +290,7 @@ void alternatingBFSTree(sycl::queue &q,
       } else {
         d[i] = -1;
       }
+      b_i[i] = 0;
       s[i] = i;
       p[i] = i;
     }
@@ -399,20 +402,24 @@ void alternatingBFSTree(sycl::queue &q,
 
     {
       //const auto read_t = sycl::access::mode::read;
-      //auto depth_i = depth.get_access<read_t>();
-      //if(depth_i[0]>0)
-          augment_a(q, 
-              matchCount,
-              rows, 
-              cols, 
-              pred,
-              dist,
-              start,
-              depth,
-              match,
-              requests,
-              matchable,
-              vertexNum);
+      // Match free to each other through bridges (red/blue).
+      augment_a(q, 
+          matchCount,
+          rows, 
+          cols, 
+          bridgeVertex,
+          pred,
+          dist,
+          start,
+          depth,
+          match,
+          requests,
+          matchable,
+          vertexNum);
+      
+      // Race for red source vertices via atomic operations.
+
+
     }
 
 

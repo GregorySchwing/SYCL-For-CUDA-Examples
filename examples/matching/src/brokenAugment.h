@@ -43,6 +43,7 @@ void augment_a(sycl::queue &q,
                 int & matchCount,
                 sycl::buffer<uint32_t> &rows, 
                 sycl::buffer<uint32_t> &cols, 
+                sycl::buffer<uint64_t> &bridgeVertex, 
                 sycl::buffer<int> &pred,
                 sycl::buffer<int> &dist,
                 sycl::buffer<int> &start,
@@ -363,7 +364,7 @@ void augment_a(sycl::queue &q,
 
         auto requests_i = requests.get_access<write_t>(h);
 
-        //auto b_i = bridgeVertex.get_access<write_t>(h);
+        auto b_i = bridgeVertex.get_access<write_t>(h);
         auto start_i = start.get_access<read_t>(h);
 
         auto dist_i = dist.get_access<read_t>(h);
@@ -402,9 +403,13 @@ void augment_a(sycl::queue &q,
                                     if (nm == 0)
                                     {
                                     //Avoid data thrashing be only looking at the request value of blue neighbours.
-                                    if (requests_i[start_i[col]] == start_i[src])
+                                    if (requests_i[start_i[col]] == srcStart)
                                     {
-                                        requests_i[start_i[src]] = start_i[col];
+                                        requests_i[srcStart] = start_i[col];
+                                        uint32_t leastSignificantWord = src;
+                                        uint32_t mostSignificantWord = col;
+                                        uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
+                                        b_i[srcStart] = edgePair;
                                         return;
                                     }
                                     }
@@ -429,6 +434,10 @@ void augment_a(sycl::queue &q,
                                     if (requests_i[start_i[col]] == start_i[src])
                                     {
                                         requests_i[start_i[src]] = start_i[col];
+                                        uint32_t leastSignificantWord = src;
+                                        uint32_t mostSignificantWord = col;
+                                        uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
+                                        b_i[start_i[src]] = edgePair;
                                         return;
                                     }
                                     }
@@ -467,6 +476,7 @@ void augment_a(sycl::queue &q,
 
         //auto b_i = bridgeVertex.get_access<write_t>(h);
         auto start_i = start.get_access<read_t>(h);
+        auto b_i = bridgeVertex.get_access<read_write_t>(h);
 
         auto dist_i = dist.get_access<read_t>(h);
         auto pred_i = pred.get_access<read_t>(h);
@@ -489,14 +499,21 @@ void augment_a(sycl::queue &q,
                                 {
                                     //Match the vertices if the request was mutual.
                                     // matched vertices point to each other.
+                                    // If blue copy the bridge into my bridge array entry
+                                    if (match_i[srcStart] == 0){
+                                        b_i[srcStart] = b_i[r];
+                                    }
                                     match_i[srcStart] = 4 + r;
                                     matchable_i[srcStart] = false;
+                                    auto edgePair = b_i[srcStart];
+                                    uint32_t u = (uint32_t)edgePair;
+                                    uint32_t v = (edgePair >> 32);
+                                    printf("Bridge %u (start %d) (src %lu) -> %u (start %d) (col %d)\n", u,start_i[u],src, v, start_i[v], r);
                                 }
 
         });
         };
         q.submit(cg7);
-
 
         {
         const auto read_t = sycl::access::mode::read;
@@ -584,6 +601,41 @@ void augment_a(sycl::queue &q,
         printf("post augment match is valid\n");
     }
     return;
+}
+
+void augment_b(sycl::queue &q, 
+                int & matchCount,
+                sycl::buffer<uint32_t> &rows, 
+                sycl::buffer<uint32_t> &cols, 
+                sycl::buffer<int> &pred,
+                sycl::buffer<int> &dist,
+                sycl::buffer<int> &start,
+                sycl::buffer<int> &depth,
+                sycl::buffer<int> &match,
+                sycl::buffer<int> &requests,
+                sycl::buffer<bool> &matchable,
+                const int vertexNum){
+
+
+    constexpr const size_t SingletonSz = 1;
+    const sycl::range Singleton{SingletonSz};
+
+    constexpr const size_t TripletonSz = 3;
+    const sycl::range Tripleton{TripletonSz};
+
+    const size_t numBlocks = vertexNum;
+    const sycl::range VertexSize{numBlocks};
+
+    const size_t threadsPerBlock = 32;
+    const size_t totalThreads = numBlocks * threadsPerBlock;
+
+    const sycl::range NumWorkItems{totalThreads};
+    const sycl::range WorkGroupSize{threadsPerBlock};
+  
+    sycl::buffer<bool> keepMatching{Singleton};
+    sycl::buffer<unsigned int> selectBarrier {Singleton};
+    sycl::buffer<unsigned int> colsum {Tripleton};
+
 }
 
 #endif

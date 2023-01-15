@@ -829,7 +829,7 @@ void atomicAugment_b(sycl::queue &q,
                             uint32_t curr_u = (uint32_t)edgePair;
                             uint32_t curr_v = (edgePair >> 32);
                             auto depth_u = dist_i[curr_u];
-                            printf("src %u match[src] %u u %u v %u", src[0], match_i[src], curr_u, curr_v);
+                            printf("src %lu match[src] %u u %u v %u", src[0], match_i[src], curr_u, curr_v);
 
                             // Even bridge, match the bridge vertices.
                             if (depth_u % 2 == 0){
