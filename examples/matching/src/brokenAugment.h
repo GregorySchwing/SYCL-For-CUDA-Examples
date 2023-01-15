@@ -37,6 +37,8 @@
 #ifndef AUGMENT_h
 #define AUGMENT_h
 #include "match.h"
+
+// Only augments bridges.  Not trivial paths or blossom contractions
 void augment_a(sycl::queue &q, 
                 int & matchCount,
                 sycl::buffer<uint32_t> &rows, 
@@ -146,12 +148,14 @@ void augment_a(sycl::queue &q,
                                 auto col = cols_i[col_index];
                                 // An edge to a vertex in my even level.
                                 if (dist_i[col] == dist_i[src]){
-                                    // If you win the first race, you make sure you get written in your slot then return.      
                                     // If you win the first race, you make sure you get written in your slot then return. 
                                     if (match_i[start_i[col]] < 4){   
-                                        matchable_i[start_i[src]] = true;
-                                        matchable_i[src] = true;
-                                        return;
+                                        // Prevent blossoms
+                                        if(start_i[src] != start_i[col]){
+                                            matchable_i[start_i[src]] = true;
+                                            matchable_i[src] = true;
+                                            return;
+                                        }
                                     }
                                 }
                             }
@@ -163,7 +167,8 @@ void augment_a(sycl::queue &q,
                                 if (match_i[col] == match_i[src] &&
                                     dist_i[col] == dist_i[src]){
                                     // If you win the first race, you make sure you get written in your slot then return.      
-                                    if (match_i[start_i[col]] < 4){   
+                                    // Prevent blossoms
+                                    if(start_i[src] != start_i[col]){
                                         matchable_i[start_i[src]] = true;
                                         matchable_i[src] = true;
                                         return;
