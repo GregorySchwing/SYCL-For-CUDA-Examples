@@ -225,6 +225,7 @@ void alternatingBFSTree(sycl::queue &q,
 }
 
 
+
 // Only continue a a src's frontier while said frontier hasnt reached a blossom/augpath.
 // This avoids wasted effort, since MS-BFS matches regenerate the BFS trees every iteration.
 // The problem is atomically handling whether a src has found an augpath.  Blossoms share a src
@@ -317,28 +318,6 @@ void alternatingBFSTree(sycl::queue &q,
     };
     q.submit(cg);
 
-
-    // Necessary to avoid atomics in setting pred/dist/start
-    // Conflicts could come from setting pred and start non-atomically.
-    // (Push phase) As dist is race-proof, only set pred in the frontier expansion 
-    // (Pull phase) pull start into new frontier.
-    // Command Group creation
-    auto cg3 = [&](sycl::handler &h) {    
-      const auto dwrite_t = sycl::access::mode::discard_write;
-      const auto read_t = sycl::access::mode::read;
-      const auto write_t = sycl::access::mode::write;
-      auto depth_i = depth.get_access<read_t>(h);
-      auto dist_i = dist.get_access<read_t>(h);
-      auto pred_i = pred.get_access<read_t>(h);
-      auto start_i = start.get_access<write_t>(h);
-      h.parallel_for(VertexSize,
-                    [=](sycl::id<1> i) { 
-        if(depth_i[0] == dist_i[i]) 
-          start_i[i] = start_i[pred_i[i]];
-      });
-    };
-    q.submit(cg3);
-
     // Command Group creation
     auto cg2 = [&](sycl::handler &h) {    
       const auto read_t = sycl::access::mode::read;
@@ -391,14 +370,37 @@ void alternatingBFSTree(sycl::queue &q,
     };
     q.submit(cg2);
 
+
+
+
+    // Necessary to avoid atomics in setting pred/dist/start
+    // Conflicts could come from setting pred and start non-atomically.
+    // (Push phase) As dist is race-proof, only set pred in the frontier expansion 
+    // (Pull phase) pull start into new frontier.
+    // Command Group creation
+    auto cg3 = [&](sycl::handler &h) {    
+      const auto read_t = sycl::access::mode::read;
+      const auto write_t = sycl::access::mode::write;
+      auto depth_i = depth.get_access<read_t>(h);
+      auto dist_i = dist.get_access<read_t>(h);
+      auto pred_i = pred.get_access<read_t>(h);
+      auto start_i = start.get_access<write_t>(h);
+      h.parallel_for(VertexSize,
+                    [=](sycl::id<1> i) { 
+        if(depth_i[0]+1 == dist_i[i]) 
+          start_i[i] = start_i[pred_i[i]];
+      });
+    };
+    q.submit(cg3);
+
     // check for bridges.  Terminate a frontier prematurely if one is found.
     // A bridge is an unmatched edge between two even levels
     // or a matched edge between two odd levels.
 
     {
-      const auto read_t = sycl::access::mode::read;
-      auto depth_i = depth.get_access<read_t>();
-      if(depth_i[0]>0)
+      //const auto read_t = sycl::access::mode::read;
+      //auto depth_i = depth.get_access<read_t>();
+      //if(depth_i[0]>0)
           augment_a(q, 
               matchCount,
               rows, 

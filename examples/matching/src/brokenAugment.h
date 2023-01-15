@@ -51,22 +51,20 @@ void augment_a(sycl::queue &q,
                 const int vertexNum){
 
 
-  constexpr const size_t SingletonSz = 1;
+    constexpr const size_t SingletonSz = 1;
+    const sycl::range Singleton{SingletonSz};
 
-  const sycl::range Singleton{SingletonSz};
+    constexpr const size_t TripletonSz = 3;
+    const sycl::range Tripleton{TripletonSz};
 
+    const size_t numBlocks = vertexNum;
+    const sycl::range VertexSize{numBlocks};
 
-  constexpr const size_t TripletonSz = 3;
-  const sycl::range Tripleton{TripletonSz};
+    const size_t threadsPerBlock = 32;
+    const size_t totalThreads = numBlocks * threadsPerBlock;
 
-  const size_t numBlocks = vertexNum;
-  const sycl::range VertexSize{numBlocks};
-
-  const size_t threadsPerBlock = 32;
-  const size_t totalThreads = numBlocks * threadsPerBlock;
-
-  const sycl::range NumWorkItems{totalThreads};
-  const sycl::range WorkGroupSize{threadsPerBlock};
+    const sycl::range NumWorkItems{totalThreads};
+    const sycl::range WorkGroupSize{threadsPerBlock};
   
     sycl::buffer<bool> keepMatching{Singleton};
     sycl::buffer<unsigned int> selectBarrier {Singleton};
@@ -108,7 +106,7 @@ void augment_a(sycl::queue &q,
 
         // Command Group creation
         // sets vertices in this next frontier which can augment/blossom and thus terminate.
-        auto cg4 = [&](sycl::handler &h) {    
+        auto cg4 = [&](sycl::handler &h) { 
         const auto read_t = sycl::access::mode::read;
         const auto write_t = sycl::access::mode::write;
         const auto read_write_t = sycl::access::mode::read_write;
@@ -132,11 +130,11 @@ void augment_a(sycl::queue &q,
                             size_t blockDim = r[0];
                             size_t threadIdx = item.get_local_id();
                             
-                            printf("src %lu dist %d depth %d start %d\n", src, dist_i[src], depth_i[0], start_i[src]);
+                            //printf("src %lu dist %d depth %d start %d\n", src, dist_i[src], depth_i[0], start_i[src]);
 
                             // Not a new frontier vertex
                             if (dist_i[src] != (depth_i[0]+1)  || match_i[start_i[src]] >= 4) return;
-                            printf("possible to color the src in %lu\n", src);
+                            //printf("possible to color the src in %lu\n", src);
                             // If you win the first race, you make sure you get written in your slot then return.
                             //sycl::atomic_ref<uint64_t, sycl::memory_order::relaxed, sycl::memory_scope::device, 
                             //sycl::access::address_space::global_space> ref_b_src(b_i[start_i[src]]);
