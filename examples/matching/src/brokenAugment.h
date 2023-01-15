@@ -489,31 +489,102 @@ void augment_a(sycl::queue &q,
                             size_t threadIdx = item.get_local_id();
                             auto srcStart = start_i[src];
                             // Not a new frontier vertex with a matchable src.
-                            if (!matchable_i[src] || dist_i[src] != depth_i[0]+1)
+                            //if (!matchable_i[src] || dist_i[src] != depth_i[0]+1)
+                            if (!matchable_i[src] || dist_i[src] != 0)
                                 return; 
 
-                                const auto r = requests_i[srcStart];
+                                const auto r = requests_i[src];
 
                                 //This vertex has made a valid request.
-                                if (requests_i[r] == srcStart)
+                                if (requests_i[r] == src)
                                 {
                                     //Match the vertices if the request was mutual.
                                     // matched vertices point to each other.
                                     // If blue copy the bridge into my bridge array entry
-                                    if (match_i[srcStart] == 0){
-                                        b_i[srcStart] = b_i[r];
+                                    // Flip the bridge so the LSW is my start.
+                                    if (match_i[src] == 0){
+                                        auto edgePair = b_i[r];
+                                        uint32_t leastSignificantWord = (uint32_t)edgePair;
+                                        uint32_t mostSignificantWord = (edgePair >> 32);
+                                        uint64_t edgePairFlipped = (uint64_t) leastSignificantWord << 32 | mostSignificantWord;
+                                        b_i[src] = edgePairFlipped;
+                                        //printf("Bridge %u s=%d -> %u s=%d; I am src %lu, my start is %d; Flipping bridge %u -> %u\n",leastSignificantWord,start_i[leastSignificantWord],mostSignificantWord,start_i[mostSignificantWord],src,start_i[src], mostSignificantWord,leastSignificantWord);
                                     }
-                                    match_i[srcStart] = 4 + r;
-                                    matchable_i[srcStart] = false;
-                                    auto edgePair = b_i[srcStart];
-                                    uint32_t u = (uint32_t)edgePair;
-                                    uint32_t v = (edgePair >> 32);
-                                    printf("Bridge %u (start %d) (src %lu) -> %u (start %d) (col %d)\n", u,start_i[u],src, v, start_i[v], r);
+                                    match_i[src] = 4 + r;
+                                    matchable_i[src] = false;
                                 }
 
         });
         };
         q.submit(cg7);
+
+
+        // Command Group creation
+        // sets vertices in this next frontier which can augment/blossom and thus terminate.
+        auto cg8 = [&](sycl::handler &h) {    
+        const auto read_t = sycl::access::mode::read;
+        const auto write_t = sycl::access::mode::write;
+        const auto read_write_t = sycl::access::mode::read_write;
+
+        auto rows_i = rows.get_access<read_t>(h);
+        auto cols_i = cols.get_access<read_t>(h);
+        auto depth_i = depth.get_access<read_t>(h);
+        auto match_i = match.get_access<write_t>(h);
+        auto matchable_i = matchable.get_access<write_t>(h);
+
+        auto requests_i = requests.get_access<write_t>(h);
+
+        //auto b_i = bridgeVertex.get_access<write_t>(h);
+        auto start_i = start.get_access<read_t>(h);
+        auto b_i = bridgeVertex.get_access<read_write_t>(h);
+
+        auto dist_i = dist.get_access<read_t>(h);
+        auto pred_i = pred.get_access<read_t>(h);
+
+        h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
+                            sycl::group<1> gr = item.get_group();
+                            sycl::range<1> ra = gr.get_local_range();
+                            size_t src = gr.get_group_linear_id();
+                            size_t blockDim = ra[0];
+                            size_t threadIdx = item.get_local_id();
+                            auto srcStart = start_i[src];
+                            // Not a new frontier vertex with a matchable src.
+                            // The only way this is a matched src vertex that is matchable
+                            // are newly matched vertices, thus we need to augment them.
+                            if (!matchable_i[src] || dist_i[src] != 0 || match_i[src]<4)
+                                return; 
+
+                            auto edgePair = b_i[src];
+                            uint32_t leastSignificantWord = (uint32_t)edgePair;
+                            uint32_t mostSignificantWord = (edgePair >> 32);
+
+                            if (start_i[leastSignificantWord] != src)
+                                printf("CATASTROPHIC ERROR! %u != %d\n", start_i[leastSignificantWord], src);
+
+                            uint32_t curr_u = leastSignificantWord;
+                            uint32_t curr_v = mostSignificantWord;
+                            auto depth_u = dist_i[curr_u];
+                            //printf("src %lu match[src] %u u %u v %u", src[0], match_i[src], curr_u, curr_v);
+
+                            // Even bridge, match the bridge vertices.
+                            if (depth_u % 2 == 0 && curr_u < curr_v){
+                                match_i[curr_u] = 4+curr_u;
+                                match_i[curr_v] = 4+curr_v;
+                            }
+
+                            for (auto curr_depth = depth_u; curr_depth > 0; --curr_depth){
+                                auto parent_u = pred_i[curr_u];
+                                if (curr_depth % 2 == 1){
+                                    match_i[curr_u] = 4 + parent_u;
+                                    match_i[parent_u] = 4 + curr_u;
+                                }
+                                curr_u = parent_u;
+                            }
+
+        });
+        };
+        q.submit(cg8);
+
 
         {
         const auto read_t = sycl::access::mode::read;
