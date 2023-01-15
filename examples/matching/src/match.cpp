@@ -173,6 +173,7 @@ int main(int argc, char *argv[]) {
     // resources.
     chrono::time_point<std::chrono::system_clock> BFS_begin, BFS_end;
     BFS_begin = std::chrono::system_clock::now(); 
+    /*
     alternatingBFSTree(myQueue, 
                       rows, 
                       cols, 
@@ -183,10 +184,29 @@ int main(int argc, char *argv[]) {
                       degree,
                       match,
                       graph.vertexNum);
+    */
+
+    alternatingBFSTree(myQueue,
+                      currentMatchc, 
+                      rows, 
+                      cols, 
+                      dist,
+                      pred,
+                      start,
+                      depth,
+                      degree,
+                      match,
+                      requests,
+                      matchable,
+                      bridgeVertex,
+                      graph.vertexNum);
+
     BFS_end = std::chrono::system_clock::now(); 
     elapsed_seconds_max = BFS_end - BFS_begin; 
     printf("\nElapsed Time for SYCL BFS: %f\n",elapsed_seconds_max.count());
     
+    /*
+
     chrono::time_point<std::chrono::system_clock> augment_begin, augment_end;
     augment_begin = std::chrono::system_clock::now(); 
     //int syclmatchc = 0;
@@ -227,6 +247,8 @@ int main(int argc, char *argv[]) {
     elapsed_seconds_max = augment_b_end - augment_b_begin; 
     printf("\nElapsed Time for SYCL augment_b: %f\n",elapsed_seconds_max.count());
     printf("\nSYCL augment size: %d\n",currentMatchc/2);
+    */
+
     /*
     // To identify one and only one Augmenting path 
     // to use the starting v.
