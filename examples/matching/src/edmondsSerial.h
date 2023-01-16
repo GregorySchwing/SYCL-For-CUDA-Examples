@@ -108,20 +108,26 @@ void EdmondsSerial::blossom_contraction(int s,int u,int v)
   for (int u=0;u<V;u++)
     if (inb[base[u]])
       {
-	base[u]=lca;
-	if (!inq[u])
-	  inq[q[++qt]=u]=true;
+        base[u]=lca;
+        if (!inq[u])
+          inq[q[++qt]=u]=true;
       }
 }
- 
+
+// Unmatched vertices find paths (which may be of length 0) to augment.
 int EdmondsSerial::find_augmenting_path(int s)
 {
   memset(inq,0,V*sizeof(bool));
   memset(father,-1,V*sizeof(int));
   for (int i=0;i<V;i++) base[i]=i;
+  // q (paths sourced at s) length n
+  // inq (bool array for easy check if in a path src'ed at s)
   inq[q[qh=qt=0]=s]=true;
   while (qh<=qt)
     {
+      // Here is where q is initialized (the path is extended)
+      // This is a post-fix so on first call q[0] = s; and qh == 1;
+      // u == s
       int u=q[qh++];
       // adj list is 2d array of edges.
       // edges store v and a ptr to the next e in the array.
@@ -137,11 +143,28 @@ int EdmondsSerial::find_augmenting_path(int s)
     for (unsigned int j = G.srcPtr[u]; j < G.srcPtr[u + 1]; ++j){
           unsigned int v =G.dst[j];
           //int v=e->v;
+          // At the begginning of this method call base[i] == i
+          // Every vertex is a blossom of size 1 based at itself.
+          // though since inb[i]==false for all i, no blossom logic is used.
+          // u and v are in different blossoms and u isnt matched to v.
           if (base[u]!=base[v]&&match[u]!=v){
+            // Since u and v arent matched, v==s indicates an alternate edge into the src
+            // v==s indicates blossoms rooted at s.
+            // If v is matched with a father, the dfs must have formed a cycle.
+            // If father[match[v]]!=-1) then the path is at least length 3. x-f[v]-matchedto-v
             if ((v==s)||(match[v]!=-1 && father[match[v]]!=-1)){
               blossom_contraction(s,u,v);
+
+
+            // Grow ontop of the tree, the path is lengthen by finding src's and telling them
+            // I am your father.  If src is unmatched, return an augmented path length 2.
+            // else if the vertex hasnt been encountered on this call to findAP, mark it as reached,
+            // and continue the search from the match of v. i.e. src = u; v-match[v]
+            // iter 0: u->v-match[v]; set u=match[v]
+            // iter 1: u-notmatched-v-matched-match[v]
             } else if (father[v]==-1)
             {
+              // grow dfs depth by 1. set pred v -> u
               father[v]=u;
               if (match[v]==-1)
                 return v;

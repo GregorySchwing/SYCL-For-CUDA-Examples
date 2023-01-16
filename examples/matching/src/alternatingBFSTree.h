@@ -404,7 +404,8 @@ void alternatingBFSTree(sycl::queue &q,
       const auto read_t = sycl::access::mode::read;
       // If depth is even, new frontier is odd, check for trivials
       auto dep = depth.get_access<read_t>();
-      if (dep[0] % 2 == 0)
+      if (dep[0] % 2 == 0){
+        printf("Frontier is odd!\n");
         augment_trivial_paths(q, 
                               matchCount,
                               pred,
@@ -413,7 +414,7 @@ void alternatingBFSTree(sycl::queue &q,
                               depth,
                               match,
                               vertexNum);  
-
+      }
       // Match free to each other through bridges (red/blue).
       augment_bridges(q, 
           matchCount,
