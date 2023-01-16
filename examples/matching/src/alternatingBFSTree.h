@@ -401,9 +401,21 @@ void alternatingBFSTree(sycl::queue &q,
     // or a matched edge between two odd levels.
 
     {
-      //const auto read_t = sycl::access::mode::read;
+      const auto read_t = sycl::access::mode::read;
+      // If depth is even, new frontier is odd, check for trivials
+      auto dep = depth.get_access<read_t>();
+      if (dep[0] % 2 == 0)
+        augment_trivial_paths(q, 
+                              matchCount,
+                              pred,
+                              dist,
+                              start,
+                              depth,
+                              match,
+                              vertexNum);  
+
       // Match free to each other through bridges (red/blue).
-      augment_a(q, 
+      augment_bridges(q, 
           matchCount,
           rows, 
           cols, 

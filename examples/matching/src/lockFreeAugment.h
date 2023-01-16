@@ -22,14 +22,14 @@
 
 // If we only augment paths, I don't think we need another iteration.
 
-// Therefore, there are two kernels, augment_a which will only augment paths
+// Therefore, there are two kernels, augment_bridges which will only augment paths
 // Then if any start vertices remain, they must be blossom structures or unaugmentable.
 // If any blossoms are contracted in augment_b, reconstruct BFS.
 
 // do {
 //      BFS
 //      AuxMatch
-//      augment_a
+//      augment_bridges
 //      augment_b_returned_true = augment_b
 // } while(augment_b_returned_true)
 
@@ -39,7 +39,7 @@
 #include "match.h"
 
 // Only augments bridges.  Not trivial paths or blossom contractions
-void augment_a(sycl::queue &q, 
+void augment_bridges(sycl::queue &q, 
                 int & matchCount,
                 sycl::buffer<uint32_t> &rows, 
                 sycl::buffer<uint32_t> &cols, 
@@ -674,19 +674,16 @@ void augment_a(sycl::queue &q,
     return;
 }
 
-void augment_b(sycl::queue &q, 
+
+// Only augments trivial paths.  Unmatched odd level vertices
+void augment_trivial_paths(sycl::queue &q, 
                 int & matchCount,
-                sycl::buffer<uint32_t> &rows, 
-                sycl::buffer<uint32_t> &cols, 
                 sycl::buffer<int> &pred,
                 sycl::buffer<int> &dist,
                 sycl::buffer<int> &start,
                 sycl::buffer<int> &depth,
                 sycl::buffer<int> &match,
-                sycl::buffer<int> &requests,
-                sycl::buffer<bool> &matchable,
                 const int vertexNum){
-
 
     constexpr const size_t SingletonSz = 1;
     const sycl::range Singleton{SingletonSz};
@@ -706,6 +703,24 @@ void augment_b(sycl::queue &q,
     sycl::buffer<bool> keepMatching{Singleton};
     sycl::buffer<unsigned int> selectBarrier {Singleton};
     sycl::buffer<unsigned int> colsum {Tripleton};
+
+    auto cg = [&](sycl::handler &h) {    
+    const auto dwrite_t = sycl::access::mode::discard_write;
+    const auto read_t = sycl::access::mode::read;
+    const auto write_t = sycl::access::mode::write;
+    const auto read_write_t = sycl::access::mode::read_write;
+    auto match_i = match.get_access<read_write_t>();
+    auto dep = depth.get_access<read_t>(h);
+    auto dist_i = dist.get_access<read_t>(h);
+    h.parallel_for(VertexSize,
+                    [=](sycl::id<1> i) { 
+        if (dist_i[i] != dep[0] + 1)
+            return;
+    });
+    };
+    q.submit(cg);
+
+
 
 }
 
