@@ -135,7 +135,7 @@ void augment_a(sycl::queue &q,
                             
                             //printf("src %lu dist %d depth %d start %d\n", src, dist_i[src], depth_i[0], start_i[src]);
 
-                            // Not a new frontier vertex
+                            // Not a new frontier vertex with an unmatched src.
                             if (dist_i[src] != (depth_i[0]+1)  || match_i[start_i[src]] >= 4) return;
                             //printf("possible to color the src in %lu\n", src);
                             // If you win the first race, you make sure you get written in your slot then return.
@@ -155,6 +155,7 @@ void augment_a(sycl::queue &q,
                                         if(start_i[src] != start_i[col]){
                                             matchable_i[start_i[src]] = true;
                                             matchable_i[src] = true;
+                                            //printf("Matchable pair %lu %u\n", src, col);
                                             return;
                                         }
                                     }
@@ -172,6 +173,7 @@ void augment_a(sycl::queue &q,
                                     if(start_i[src] != start_i[col]){
                                         matchable_i[start_i[src]] = true;
                                         matchable_i[src] = true;
+                                        //printf("Matchable pair %lu %u\n", src, col);
                                         return;
                                     }
                                 }
@@ -180,7 +182,7 @@ void augment_a(sycl::queue &q,
         });
         };
         q.submit(cg4);
-
+        //fflush(stdout);
 
         // Color vertices
         // Request vertices - one workitem per workgroup
@@ -611,10 +613,9 @@ void augment_a(sycl::queue &q,
         std::cout << "red count : " << cs[0] << std::endl;
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
-        std::cout << "matched count : " << (vertexNum-(cs[0]+cs[1]+cs[2]))/2 << std::endl;
-
+        std::cout << "matched count : " << (vertexNum-(cs[0]+cs[1]+cs[2])) << std::endl;
         printf("Iteration %d depth %d\n", iteration++, depth_i[0]+1);
-
+        //fflush(stdout);
         }
         //#endif
         // just to keep from entering an inf loop till all matching logic is done.
@@ -652,7 +653,7 @@ void augment_a(sycl::queue &q,
             else if(m[i] >= 4)
                 ++cm_i[i];
         }
-        //#ifdef NDEBUG
+        #ifdef NDEBUG
         std::cout << "red count : " << cs[0] << std::endl;
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
@@ -663,8 +664,8 @@ void augment_a(sycl::queue &q,
                 printf("Error %d is matched %d times\n", i, cm_i[i]);
             }
         }  
-        //#endif
-        matchCount = (vertexNum-(cs[0]+cs[1]+cs[2]))/2;
+        #endif
+        matchCount = (vertexNum-(cs[0]+cs[1]+cs[2]));
 
     }
     if(validMatch){
