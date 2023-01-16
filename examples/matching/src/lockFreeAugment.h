@@ -567,8 +567,8 @@ void augment_a(sycl::queue &q,
 
                             // Even bridge, match the bridge vertices.
                             if (depth_u % 2 == 0 && curr_u < curr_v){
-                                match_i[curr_u] = 4+curr_u;
-                                match_i[curr_v] = 4+curr_v;
+                                match_i[curr_u] = 4+curr_v;
+                                match_i[curr_v] = 4+curr_u;
                             }
 
                             for (auto curr_depth = depth_u; curr_depth > 0; --curr_depth){
