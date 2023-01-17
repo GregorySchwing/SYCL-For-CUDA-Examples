@@ -99,11 +99,14 @@ void augment_bridges(sycl::queue &q,
         const auto dwrite_t = sycl::access::mode::discard_write;
         const auto read_t = sycl::access::mode::read;
         const auto write_t = sycl::access::mode::write;
+        const auto read_write_t = sycl::access::mode::read_write;
+        auto m_i = match.get_access<read_write_t>(h);
 
         auto matchable_i = matchable.get_access<dwrite_t>(h);
         h.parallel_for(VertexSize,
                         [=](sycl::id<1> i) { 
             matchable_i[i] = false;
+            if (m_i[i]<4) m_i[i]=2;
         });
         };
         q.submit(cg);
