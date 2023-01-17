@@ -21,5 +21,6 @@ struct CSRGraph{
     unsigned int findMaxDegree();
     void printGraph();
     void del();
+    bool has(uint u, uint v);
 };
 #endif

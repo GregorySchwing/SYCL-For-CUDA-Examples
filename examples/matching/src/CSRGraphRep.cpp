@@ -56,6 +56,19 @@ void CSRGraph::deleteVertex(unsigned int v){
     degree[v]=-1;
 }
 
+bool CSRGraph::has(uint u, uint v){
+    auto src = u;
+    bool foundEdge = false;
+    for (auto col_index = srcPtr[src]; col_index < srcPtr[src+1]; ++col_index){
+        auto col = dst[col_index];
+        foundEdge |= col == v;
+        if(foundEdge)
+            return foundEdge;
+    }
+    return foundEdge;
+}
+
+
 unsigned int CSRGraph::findMaxDegree(){
     unsigned int max = 0;
     unsigned int maxd = 0;

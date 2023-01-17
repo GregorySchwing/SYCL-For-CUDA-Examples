@@ -40,6 +40,7 @@
 
 // Only augments bridges.  Not trivial paths or blossom contractions
 void augment_bridges(sycl::queue &q, 
+                CSRGraph & g,
                 int & matchCount,
                 sycl::buffer<uint32_t> &rows, 
                 sycl::buffer<uint32_t> &cols, 
@@ -553,7 +554,7 @@ void augment_bridges(sycl::queue &q,
                             // Not a new frontier vertex with a matchable src.
                             // The only way this is a matched src vertex that is matchable
                             // are newly matched vertices, thus we need to augment them.
-                            if (!matchable_i[src] || dist_i[src] != 0 || match_i[src]<4)
+                            if (matchable_i[src] || dist_i[src] != 0 || match_i[src]<4)
                                 return; 
 
                             auto edgePair = b_i[src];
@@ -569,12 +570,27 @@ void augment_bridges(sycl::queue &q,
 
                             // Even bridge, match the bridge vertices.
                             if (depth_u % 2 == 0 && curr_u < curr_v){
+                                bool has = false;
+                                for (auto col_index = rows_i[curr_u]; col_index < rows_i[curr_u+1]; ++col_index){
+                                    auto col = cols_i[col_index];
+                                    has |= curr_v == col;                           
+                                }
+                                if (!has)
+                                    printf("CATASTROPHIC ERROR! BRIDGE EDGE %u - %u DNE\n", curr_u, curr_v);
+
                                 match_i[curr_u] = 4+curr_v;
                                 match_i[curr_v] = 4+curr_u;
                             }
 
                             for (auto curr_depth = depth_u; curr_depth > 0; --curr_depth){
                                 auto parent_u = pred_i[curr_u];
+                                bool has = false;
+                                for (auto col_index = rows_i[curr_u]; col_index < rows_i[curr_u+1]; ++col_index){
+                                    auto col = cols_i[col_index];
+                                    has |= parent_u == col;                           
+                                }
+                                if (!has)
+                                    printf("CATASTROPHIC ERROR! PRED EDGE %u - %u DNE\n", curr_u, curr_v);
                                 if (curr_depth % 2 == 1){
                                     match_i[curr_u] = 4 + parent_u;
                                     match_i[parent_u] = 4 + curr_u;
@@ -610,6 +626,21 @@ void augment_bridges(sycl::queue &q,
             ++cs[m[i]];
             //printf("%d %d\n",i,m[i]);
         }
+        
+        
+
+        bool bad = false;
+        for (int i = 0; i < g.vertexNum; i++) {
+            if (m[i] >= 4 && !g.has((m[i]-4), (m[(m[i]-4)]-4))){
+            printf("Matching between vertices over non-exisiting edge!!! %d %d\n",(m[i]-4),(m[(m[i]-4)]-4));
+            bad = true;
+            }
+        }
+        if (bad){
+            fflush(stdout);
+            exit(1);
+        }
+        
         std::cout << "red count : " << cs[0] << std::endl;
         std::cout << "blue count : " << cs[1] << std::endl;
         std::cout << "dead count : " << cs[2] << std::endl;
@@ -833,6 +864,7 @@ void contract_blossoms(sycl::queue &q,
                             //printf("src %lu dist %d depth %d start %d\n", src, dist_i[src], depth_i[0], start_i[src]);
 
                             // Not a new frontier vertex with an unmatched src.
+                            // It's very important that src is unmatched, since this is called after augment_paths.
                             if (dist_i[src] != (depth_i[0]+1)  || match_i[start_i[src]] >= 4) return;
                             //printf("possible to color the src in %lu\n", src);
                             // If you win the first race, you make sure you get written in your slot then return.
@@ -879,8 +911,8 @@ void contract_blossoms(sycl::queue &q,
         });
         };
         q.submit(cg4);
-        //fflush(stdout);
-
+        fflush(stdout);
+        /*
         // Color vertices
         // Request vertices - one workitem per workgroup
         // Command Group creation
@@ -1316,7 +1348,8 @@ void contract_blossoms(sycl::queue &q,
         }
         //#endif
         // just to keep from entering an inf loop till all matching logic is done.
-        //flag = false;
+        */
+        flag = false;
     } while(flag);
 
     

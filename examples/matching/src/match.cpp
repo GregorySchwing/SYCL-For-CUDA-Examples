@@ -120,6 +120,27 @@ int main(int argc, char *argv[]) {
   initial_match_end = std::chrono::system_clock::now(); 
 	elapsed_seconds_max = initial_match_end - initial_match_begin; 
 
+  {
+    const auto read_t = sycl::access::mode::read;
+    const auto write_t = sycl::access::mode::write;
+    const auto dwrite_t = sycl::access::mode::discard_write;
+    const auto read_write_t = sycl::access::mode::read_write;
+
+
+    auto m = match.get_access<read_t>();
+    bool bad = false;
+    for (int i = 0; i < graph.vertexNum; i++) {
+      if (m[i] >= 4 && !graph.has((m[i]-4), (m[(m[i]-4)]-4))){
+        printf("Matching between vertices over non-exisiting edge!!! %d %d\n",(m[i]-4),(m[(m[i]-4)]-4));
+        bad = true;
+      }
+    }
+    if (bad){
+      fflush(stdout);
+      exit(1);
+    }
+  }
+
   printf("\nElapsed Time for SYCL Initial Max Match: %f\n",elapsed_seconds_max.count());
   printf("SYCL initial match count is: %u\n", syclinitmatchc/2);
 
@@ -136,6 +157,29 @@ int main(int argc, char *argv[]) {
                 config.barrier);
   nd_item_initial_match_end = std::chrono::system_clock::now(); 
 	elapsed_seconds_max = nd_item_initial_match_end - nd_item_initial_match_begin; 
+
+
+
+  {
+    const auto read_t = sycl::access::mode::read;
+    const auto write_t = sycl::access::mode::write;
+    const auto dwrite_t = sycl::access::mode::discard_write;
+    const auto read_write_t = sycl::access::mode::read_write;
+
+
+    auto m = match.get_access<read_t>();
+    bool bad = false;
+    for (int i = 0; i < graph.vertexNum; i++) {
+      if (m[i] >= 4 && !graph.has((m[i]-4), (m[(m[i]-4)]-4))){
+        printf("Matching between vertices over non-exisiting edge!!! %d %d\n",(m[i]-4),(m[(m[i]-4)]-4));
+        bad = true;
+      }
+    }
+    if (bad){
+      fflush(stdout);
+      exit(1);
+    }
+  }
 
   printf("\nElapsed Time for SYCL NDItem Initial Max Match: %f\n",elapsed_seconds_max.count());
   printf("SYCL initial match count is: %u\n", nditem_syclinitmatchc/2);
@@ -187,6 +231,7 @@ int main(int argc, char *argv[]) {
     */
 
     alternatingBFSTree(myQueue,
+                      graph,
                       currentMatchc, 
                       rows, 
                       cols, 
@@ -302,7 +347,7 @@ int main(int argc, char *argv[]) {
     elapsed_seconds_max = augment_end - augment_begin; 
     printf("\nElapsed Time for SYCL augment: %f\n",elapsed_seconds_max.count());
     */
-    //printf("\nIteration %d\n",iteration++);
+    printf("\nOuter Iteration %d\n",iteration++);
   //} while (prevMatchc != currentMatchc); 
 
     
@@ -359,6 +404,24 @@ int main(int argc, char *argv[]) {
 
   //augment_b
   
+
+
+  // Initialize input data
+  {
+    const auto read_t = sycl::access::mode::read;
+    const auto write_t = sycl::access::mode::write;
+    const auto dwrite_t = sycl::access::mode::discard_write;
+    const auto read_write_t = sycl::access::mode::read_write;
+
+
+    auto m = match.get_access<read_t>();
+
+    for (int i = 0; i < graph.vertexNum; i++) {
+      if (m[i] >= 4 && !graph.has((m[i]-4), (m[(m[i]-4)]-4))){
+        printf("Matching between vertices over non-exisiting edge!!! %d %d\n",(m[i]-4),(m[(m[i]-4)]-4));
+      }
+    }
+  }
 
   end = std::chrono::system_clock::now(); 
 	elapsed_seconds_max = end - begin; 

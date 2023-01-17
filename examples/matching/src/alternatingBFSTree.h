@@ -231,6 +231,7 @@ void alternatingBFSTree(sycl::queue &q,
 // The problem is atomically handling whether a src has found an augpath.  Blossoms share a src
 // so there is no difficulty.
 void alternatingBFSTree(sycl::queue &q, 
+                CSRGraph & g,
                 int & matchCount,
                 sycl::buffer<uint32_t> &rows, 
                 sycl::buffer<uint32_t> &cols, 
@@ -360,7 +361,7 @@ void alternatingBFSTree(sycl::queue &q,
                               }
                           }
                         } else {
-                          auto col = match_i[src];  
+                          auto col = match_i[src]-4;  
                           // If this edge is matched, I know the next vertex already
                           if (dist_i[col] == -1 && 4 <= col){
                               //if (dist_i[col] == -1 && (match_i[src] == match_i[col])){
@@ -396,10 +397,38 @@ void alternatingBFSTree(sycl::queue &q,
     };
     q.submit(cg3);
 
+
+
+    {
+      const auto read_t = sycl::access::mode::read;
+      const auto write_t = sycl::access::mode::write;
+      const auto dwrite_t = sycl::access::mode::discard_write;
+      const auto read_write_t = sycl::access::mode::read_write;
+      bool bad = false;
+
+      auto m = match.get_access<read_t>();
+      auto pred_i = pred.get_access<read_t>();
+
+      for (int i = 0; i < g.vertexNum; i++) {
+        if (pred_i[i] != i  && !g.has(pred_i[i], i)){
+          printf("CATASTROPHIC ERROR! PRED EDGE %u - %u DNE\n",pred_i[i],i);
+          bad = true;
+        }
+      }
+      if (bad){
+        printf("BFS FAIL!!!\n");
+        fflush(stdout);
+        exit(1);
+      }else{
+        printf("BFS SUCCESS!!!\n");
+        fflush(stdout);
+      }
+    }
+
     // check for bridges.  Terminate a frontier prematurely if one is found.
     // A bridge is an unmatched edge between two even levels
     // or a matched edge between two odd levels.
-
+    /*
     {
       const auto read_t = sycl::access::mode::read;
       // If depth is even, new frontier is odd, check for trivials
@@ -417,6 +446,7 @@ void alternatingBFSTree(sycl::queue &q,
       }
       // Match free to each other through bridges (red/blue).
       augment_bridges(q, 
+          g,
           matchCount,
           rows, 
           cols, 
@@ -430,11 +460,42 @@ void alternatingBFSTree(sycl::queue &q,
           matchable,
           vertexNum);
       
-      // Race for red source vertices via atomic operations.
-
-
+      // Contract blossoms
+      contract_blossoms(q, 
+          matchCount,
+          rows, 
+          cols, 
+          bridgeVertex,
+          pred,
+          dist,
+          start,
+          depth,
+          match,
+          requests,
+          matchable,
+          vertexNum);
     }
+    */
+    {
+      const auto read_t = sycl::access::mode::read;
+      const auto write_t = sycl::access::mode::write;
+      const auto dwrite_t = sycl::access::mode::discard_write;
+      const auto read_write_t = sycl::access::mode::read_write;
+      bool bad = false;
 
+      auto m = match.get_access<read_t>();
+
+      for (int i = 0; i < g.vertexNum; i++) {
+        if (m[i] >= 4 && !g.has((m[i]-4), (m[(m[i]-4)]-4))){
+          printf("Matching between vertices over non-exisiting edge!!! %d %d\n",(m[i]-4),(m[(m[i]-4)]-4));
+          bad = true;
+        }
+      }
+      if (bad){
+        fflush(stdout);
+        exit(1);
+      }
+    }
 
 
 
