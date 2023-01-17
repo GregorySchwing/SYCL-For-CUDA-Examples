@@ -67,6 +67,7 @@ int main(int argc, char *argv[]) {
   sycl::buffer<int> match{VertexSize};
   // Intermediate vector
   sycl::buffer<int> requests{VertexSize};
+  sycl::buffer<int> blossoms{VertexSize};
   // Two uint32's are packed into a space.  This way we avoid atomics.
   sycl::buffer<uint64_t> bridgeVertex{VertexSize};
 
@@ -241,6 +242,7 @@ int main(int argc, char *argv[]) {
                       degree,
                       match,
                       requests,
+                      blossoms,
                       matchable,
                       bridgeVertex,
                       graph.vertexNum);

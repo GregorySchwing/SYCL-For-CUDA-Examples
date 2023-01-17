@@ -781,6 +781,7 @@ void contract_blossoms(sycl::queue &q,
                 sycl::buffer<int> &depth,
                 sycl::buffer<int> &match,
                 sycl::buffer<int> &requests,
+                sycl::buffer<int> &blossoms,
                 sycl::buffer<bool> &matchable,
                 const int vertexNum){
 

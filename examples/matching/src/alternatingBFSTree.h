@@ -241,6 +241,7 @@ void alternatingBFSTree(sycl::queue &q,
                 sycl::buffer<int> &degree,
                 sycl::buffer<int> &match,
                 sycl::buffer<int> &requests,
+                sycl::buffer<int> &blossoms,
                 sycl::buffer<bool> &matchable,
                 sycl::buffer<uint64_t> &bridgeVertex,
                 const int vertexNum){
@@ -277,6 +278,7 @@ void alternatingBFSTree(sycl::queue &q,
     auto d = dist.get_access<dwrite_t>();    
     auto p = pred.get_access<dwrite_t>();
     auto s = start.get_access<dwrite_t>();
+    auto blos = blossoms.get_access<dwrite_t>();
 
     auto dep = depth.get_access<dwrite_t>();
     auto exp = expanded.get_access<dwrite_t>();
@@ -294,6 +296,7 @@ void alternatingBFSTree(sycl::queue &q,
       b_i[i] = 0;
       s[i] = i;
       p[i] = i;
+      blos[i]=i;
     }
     dep[0] = -1;
     exp[0] = 0;
@@ -458,7 +461,6 @@ void alternatingBFSTree(sycl::queue &q,
           requests,
           matchable,
           vertexNum);
-          /*
       // Contract blossoms
       contract_blossoms(q, 
           matchCount,
@@ -471,10 +473,9 @@ void alternatingBFSTree(sycl::queue &q,
           depth,
           match,
           requests,
+          blossoms,
           matchable,
           vertexNum);
-              */
-
     }
     {
       const auto read_t = sycl::access::mode::read;
