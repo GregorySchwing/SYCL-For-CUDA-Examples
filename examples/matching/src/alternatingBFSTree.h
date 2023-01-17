@@ -428,7 +428,6 @@ void alternatingBFSTree(sycl::queue &q,
     // check for bridges.  Terminate a frontier prematurely if one is found.
     // A bridge is an unmatched edge between two even levels
     // or a matched edge between two odd levels.
-    /*
     {
       const auto read_t = sycl::access::mode::read;
       // If depth is even, new frontier is odd, check for trivials
@@ -459,7 +458,7 @@ void alternatingBFSTree(sycl::queue &q,
           requests,
           matchable,
           vertexNum);
-      
+          /*
       // Contract blossoms
       contract_blossoms(q, 
           matchCount,
@@ -474,8 +473,9 @@ void alternatingBFSTree(sycl::queue &q,
           requests,
           matchable,
           vertexNum);
+              */
+
     }
-    */
     {
       const auto read_t = sycl::access::mode::read;
       const auto write_t = sycl::access::mode::write;
