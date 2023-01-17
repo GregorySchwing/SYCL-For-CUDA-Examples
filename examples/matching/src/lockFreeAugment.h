@@ -781,8 +781,10 @@ void contract_blossoms(sycl::queue &q,
                 sycl::buffer<int> &depth,
                 sycl::buffer<int> &match,
                 sycl::buffer<int> &requests,
-                sycl::buffer<int> &blossoms,
                 sycl::buffer<bool> &matchable,
+                sycl::buffer<int> &base,
+                sycl::buffer<int> &forward,
+                sycl::buffer<int> &backward,
                 const int vertexNum){
 
 
@@ -854,6 +856,7 @@ void contract_blossoms(sycl::queue &q,
 
         //auto b_i = bridgeVertex.get_access<write_t>(h);
         auto start_i = start.get_access<read_t>(h);
+        auto b_i = bridgeVertex.get_access<write_t>(h);
 
         auto dist_i = dist.get_access<read_t>(h);
         auto pred_i = pred.get_access<read_t>(h);
@@ -888,6 +891,10 @@ void contract_blossoms(sycl::queue &q,
                                         if(start_i[src] == start_i[col]){
                                             matchable_i[start_i[src]] = true;
                                             matchable_i[src] = true;
+                                            uint32_t leastSignificantWord = src;
+                                            uint32_t mostSignificantWord = col;
+                                            uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
+                                            b_i[start_i[src]] = edgePair;
                                             printf("Blossom bridge pair %lu %u\n", src, col);
                                             return;
                                         }
@@ -906,6 +913,10 @@ void contract_blossoms(sycl::queue &q,
                                     if(start_i[src] == start_i[col]){
                                         matchable_i[start_i[src]] = true;
                                         matchable_i[src] = true;
+                                        uint32_t leastSignificantWord = src;
+                                        uint32_t mostSignificantWord = col;
+                                        uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
+                                        b_i[start_i[src]] = edgePair;
                                         printf("Blossom bridge pair %lu %u\n", src, col);
                                         return;
                                     }
@@ -916,173 +927,6 @@ void contract_blossoms(sycl::queue &q,
         };
         q.submit(cg4);
         fflush(stdout);
-        /*
-        // Color vertices
-        // Request vertices - one workitem per workgroup
-        // Command Group creation
-        auto cgC = [&](sycl::handler &h) {    
-            const auto read_t = sycl::access::mode::read;
-            const auto read_write_t = sycl::access::mode::read_write;
-            const auto dwrite_t = sycl::access::mode::discard_write;
-            const auto write_t = sycl::access::mode::write;
-
-            // dist
-            auto sb = selectBarrier.get_access<read_t>(h);
-            auto randNum = rand();
-            auto aMD5K = MD5K.get_access<read_t>(h);
-            auto aMD5R = MD5R.get_access<read_t>(h);
-
-            auto dist_i = dist.get_access<read_t>(h);
-
-            auto matchable_i = matchable.get_access<read_t>(h);
-            auto match_i = match.get_access<read_write_t>(h);
-            auto km = keepMatching.get_access<write_t>(h);
-
-            h.parallel_for(VertexSize,
-                            [=](sycl::id<1> i) { 
-                // Unnecessary
-                // if (i >= vertexNum) return;
-
-                //The dest 0 vertices are colored red/blue
-                if (!matchable_i[i] || dist_i[i] != 0 || match_i[i] >= 4) return;
-
-                // cant be type dwrite_t (must be write_t) or this is always reacher somehow.
-                km[0] = true;
-                // Some vertices can still match.
-                // TODO: template the hash functions in hashing/ for testing here.
-                //Start hashing.
-                uint h0 = 0x67452301, h1 = 0xefcdab89, h2 = 0x98badcfe, h3 = 0x10325476;
-                uint a = h0, b = h1, c = h2, d = h3, e, f, g = i;
-
-                for (int j = 0; j < 16; ++j)
-                {
-                f = (b & c) | ((~b) & d);
-
-                e = d;
-                d = c;
-                c = b;
-                b += LEFTROTATE(a + f + aMD5K[j] + g, aMD5R[j]);
-                a = e;
-
-                h0 += a;
-                h1 += b;
-                h2 += c;
-                h3 += d;
-                g *= randNum;
-                }
-                match_i[i] = ((h0 + h1 + h2 + h3) < sb[0] ? 0 : 1);
-            });
-        };
-        q.submit(cgC);
-
-
-        // check for bridges.  Terminate a frontier prematurely if one is found.
-        // A bridge is an unmatched edge between two even levels
-        // or a matched edge between two odd levels.
-
-        // Command Group creation
-        // sets vertices in this next frontier which can augment/blossom and thus terminate.
-        auto cg5 = [&](sycl::handler &h) {    
-        const auto read_t = sycl::access::mode::read;
-        const auto write_t = sycl::access::mode::write;
-        const auto read_write_t = sycl::access::mode::read_write;
-
-        auto rows_i = rows.get_access<read_t>(h);
-        auto cols_i = cols.get_access<read_t>(h);
-        auto depth_i = depth.get_access<read_t>(h);
-        auto match_i = match.get_access<read_t>(h);
-        auto matchable_i = matchable.get_access<write_t>(h);
-
-        auto requests_i = requests.get_access<write_t>(h);
-
-        //auto b_i = bridgeVertex.get_access<write_t>(h);
-        auto start_i = start.get_access<read_t>(h);
-
-        auto dist_i = dist.get_access<read_t>(h);
-        auto pred_i = pred.get_access<read_t>(h);
-
-        h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
-                            sycl::group<1> gr = item.get_group();
-                            sycl::range<1> r = gr.get_local_range();
-                            size_t src = gr.get_group_linear_id();
-                            size_t blockDim = r[0];
-                            size_t threadIdx = item.get_local_id();
-                            auto srcStart = start_i[src];
-                            // Not a new frontier vertex with a matchable src.
-                            if (!matchable_i[src] || dist_i[src] != depth_i[0]+1)
-                                return; 
-
-                            // I am blue
-                            if (match_i[srcStart] == 0){
-                            int dead = 1;
-
-                            // A bridge is an unmatched edge between two even levels
-                            if ((depth_i[0]+1) % 2 == 0){
-                                for (auto col_index = rows_i[src]; col_index < rows_i[src+1]; ++col_index){
-                                //for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){                            
-                                auto col = cols_i[col_index];
-                                // An edge to a vertex in my even level.
-                                if (dist_i[col] == dist_i[src]){
-
-                                    const auto nm = match_i[start_i[col]];
-
-                                    //Do we have an unmatched neighbour?
-                                    if (nm < 4)
-                                    {
-                                    //Is this neighbour red?
-                                    if (nm == 1)
-                                    {
-                                        //Propose to this neighbour.
-                                        requests_i[srcStart] = start_i[col];
-                                        return;
-                                    }
-                                    
-                                    dead = 0;
-                                    }
-                                }
-                                }
-                                // Dont bother killing vertices.
-                                // All the neighbors tried.
-                                //requests_i[src] = vertexNum + dead;
-                            } else {
-                                for (auto col_index = rows_i[src]; col_index < rows_i[src+1]; ++col_index){
-                                //for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
-                                auto col = cols_i[col_index];
-                                // A matched edge to a vertex in my odd level.
-                                if (match_i[col] == match_i[src] &&
-                                    dist_i[col] == dist_i[src]){
-
-                                    const auto nm = match_i[start_i[col]];
-
-                                    //Do we have an unmatched neighbour?
-                                    if (nm < 4)
-                                    {
-                                    //Is this neighbour red?
-                                    if (nm == 1)
-                                    {
-                                        //Propose to this neighbour.
-                                        requests_i[srcStart] = start_i[col];
-                                        return;
-                                    }
-                                    
-                                    dead = 0;
-                                    }
-                                }
-                                // Dont bother killing vertices.
-                                // All the neighbors tried.
-                                //requests_i[src] = vertexNum + dead;                            }
-                                }       
-                            } 
-                            }
-                            //else
-                            //{
-                            //Clear request value.
-                            //requests_i[src] = vertexNum;
-                            //}  
-        });
-        };
-        q.submit(cg5);
-
 
         // Command Group creation
         // sets vertices in this next frontier which can augment/blossom and thus terminate.
@@ -1352,7 +1196,6 @@ void contract_blossoms(sycl::queue &q,
         }
         //#endif
         // just to keep from entering an inf loop till all matching logic is done.
-        */
         flag = false;
     } while(flag);
 

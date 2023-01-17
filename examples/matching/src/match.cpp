@@ -67,7 +67,6 @@ int main(int argc, char *argv[]) {
   sycl::buffer<int> match{VertexSize};
   // Intermediate vector
   sycl::buffer<int> requests{VertexSize};
-  sycl::buffer<int> blossoms{VertexSize};
   // Two uint32's are packed into a space.  This way we avoid atomics.
   sycl::buffer<uint64_t> bridgeVertex{VertexSize};
 
@@ -208,6 +207,21 @@ int main(int argc, char *argv[]) {
   // For the augmenting methods
   sycl::buffer<bool> matchable{VertexSize};
 
+  sycl::buffer<int> base{VertexSize};
+  sycl::buffer<int> forward{VertexSize};
+  sycl::buffer<int> backward{VertexSize};
+
+  {
+    const auto dwrite_t = sycl::access::mode::discard_write;
+    auto base_i = base.get_access<dwrite_t>();
+    auto forward_i = forward.get_access<dwrite_t>();
+    auto backward_i = backward.get_access<dwrite_t>();
+    for (int i = 0; i < graph.vertexNum; i++) {
+      base_i[i] = i;
+      forward_i[i] = i;
+      backward_i[i] = i;
+    }
+  }
 
   int currentMatchc = 0, prevMatchc = 0, iteration = 0;
   currentMatchc = nditem_syclinitmatchc;
@@ -242,9 +256,11 @@ int main(int argc, char *argv[]) {
                       degree,
                       match,
                       requests,
-                      blossoms,
                       matchable,
                       bridgeVertex,
+                      base,
+                      forward,
+                      backward,
                       graph.vertexNum);
 
     BFS_end = std::chrono::system_clock::now(); 
