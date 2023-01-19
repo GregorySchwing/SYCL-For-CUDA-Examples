@@ -217,9 +217,9 @@ int main(int argc, char *argv[]) {
     auto forward_i = forward.get_access<dwrite_t>();
     auto backward_i = backward.get_access<dwrite_t>();
     for (int i = 0; i < graph.vertexNum; i++) {
-      base_i[i] = i;
-      forward_i[i] = i;
-      backward_i[i] = i;
+      base_i[i] = -1;
+      forward_i[i] = -1;
+      backward_i[i] = -1;
     }
   }
 

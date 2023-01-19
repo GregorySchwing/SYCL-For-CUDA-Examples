@@ -310,6 +310,7 @@ void alternatingBFSTree(sycl::queue &q,
   //printf("get_local_range %lu get_global_range %lu get_group_range %lu \n", test.get_local_range()[0],  test.get_global_range()[0],  test.get_group_range()[0]);
 
   bool flag = false;
+  bool blossomsContracted = false;
   do{
 
     {
@@ -341,6 +342,9 @@ void alternatingBFSTree(sycl::queue &q,
       auto expanded_i = expanded.get_access<write_t>(h);
       auto dist_i = dist.get_access<read_write_t>(h);
       auto pred_i = pred.get_access<write_t>(h);
+      auto base_i = base.get_access<read_t>(h);
+      auto for_i = forward.get_access<read_t>(h);
+
 
       h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
                         sycl::group<1> gr = item.get_group();
@@ -363,6 +367,16 @@ void alternatingBFSTree(sycl::queue &q,
                                 dist_i[col] = dist_i[src] + 1;
                                 pred_i[col] = src;
                                 expanded_i[0] = 1;
+                                // This is a blossom vertex.  Write to all the entries.
+                                if (base_i[col] != -1){
+                                  auto base = base_i[col];
+                                  auto curr_u = col;
+                                  //while(for_i[curr_u] != base){
+                                  //  dist_i[curr_u] = dist_i[src] + 1;
+                                  //  pred_i[curr_u] = src;
+                                  //  curr_u = for_i[curr_u];
+                                  //}
+                                }
                               }
                           }
                         } else {
@@ -373,6 +387,16 @@ void alternatingBFSTree(sycl::queue &q,
                               dist_i[col] = dist_i[src] + 1;
                               pred_i[col] = src;
                               expanded_i[0] = 1;
+                              // This is a blossom vertex.  Write to all the entries.
+                              if (base_i[col] != -1){
+                                auto base = base_i[col];
+                                auto curr_u = col;
+                                  //while(for_i[curr_u] != base){
+                                  //  dist_i[curr_u] = dist_i[src] + 1;
+                                  //  pred_i[curr_u] = src;
+                                  //  curr_u = for_i[curr_u];
+                                  //}
+                              }
                           }
                         }       
       });
@@ -464,7 +488,7 @@ void alternatingBFSTree(sycl::queue &q,
           matchable,
           vertexNum);
       // Contract blossoms
-      bool blossomsContracted = contract_blossoms(q, 
+      blossomsContracted = contract_blossoms(q, 
                                           matchCount,
                                           rows, 
                                           cols, 

@@ -990,6 +990,13 @@ bool contract_blossoms(sycl::queue &q,
                             parent_v = pred_i[curr_v];
                             //printf("curr_u %u curr_v %u base %u base %u\n", curr_u,curr_v,base,base);
                         }
+                        auto base_u = base_i[curr_u];
+                        auto curr_ut = base_u;
+                        printf("u %u base_u %d\n", src, base_u);
+                        while(for_i[curr_ut] != base_u){
+                            printf("%d -> %d\n", curr_ut, for_i[curr_ut]);
+                            curr_ut = for_i[curr_ut];
+                        }
 
     });
     };
