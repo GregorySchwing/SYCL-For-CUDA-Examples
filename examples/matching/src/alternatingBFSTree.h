@@ -464,22 +464,22 @@ void alternatingBFSTree(sycl::queue &q,
           matchable,
           vertexNum);
       // Contract blossoms
-      contract_blossoms(q, 
-          matchCount,
-          rows, 
-          cols, 
-          bridgeVertex,
-          pred,
-          dist,
-          start,
-          depth,
-          match,
-          requests,
-          matchable,
-          base,
-          forward,
-          backward,
-          vertexNum);
+      bool blossomsContracted = contract_blossoms(q, 
+                                          matchCount,
+                                          rows, 
+                                          cols, 
+                                          bridgeVertex,
+                                          pred,
+                                          dist,
+                                          start,
+                                          depth,
+                                          match,
+                                          requests,
+                                          matchable,
+                                          base,
+                                          forward,
+                                          backward,
+                                          vertexNum);
     }
     {
       const auto read_t = sycl::access::mode::read;
