@@ -89,6 +89,8 @@ void EdmondsSerial::mark_blossom(int lca,int u)
   while (base[u]!=lca)
     {
       int v=match[u];
+      // This is how they handle nested blossoms.
+      // base is separate from in blossom.
       inb[base[u]]=inb[base[v]]=true;
       u=father[v];
       if (base[u]!=lca) father[u]=v;

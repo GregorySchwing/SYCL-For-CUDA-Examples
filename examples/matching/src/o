@@ -1,0 +1,402 @@
+
+Graph file: ../../../test/test_graphs/Power-Grid.txt
+UUID: 1
+finished checking
+Running on Intel(R) Xeon(R) W-10885M CPU @ 2.40GHz
+Selected device : Intel(R) Xeon(R) W-10885M CPU @ 2.40GHz
+selectBarrier 2293765939
+Match 1 is valid
+
+Elapsed Time for SYCL Initial Max Match: 18.123470
+SYCL initial match count is: 1834
+selectBarrier 2293765939
+red count : 0
+blue count : 0
+dead count : 1270
+matched count : 1836
+Match 1 is valid
+
+Elapsed Time for SYCL NDItem Initial Max Match: 0.033345
+SYCL initial match count is: 1836
+Num degree zero vertices 1
+BFS SUCCESS!!!
+red count : 0
+blue count : 0
+dead count : 1270
+matched count : 3672
+Iteration 0 depth 1
+post augment match is valid
+BFS SUCCESS!!!
+red count : 61
+blue count : 16
+dead count : 1119
+matched count : 3746
+Iteration 0 depth 2
+red count : 15
+blue count : 14
+dead count : 1133
+matched count : 3780
+Iteration 1 depth 2
+red count : 2
+blue count : 6
+dead count : 1136
+matched count : 3798
+Iteration 2 depth 2
+red count : 2
+blue count : 0
+dead count : 1136
+matched count : 3804
+Iteration 3 depth 2
+red count : 2
+blue count : 0
+dead count : 1136
+matched count : 3804
+Iteration 4 depth 2
+red count : 2
+blue count : 0
+dead count : 1136
+matched count : 3804
+Iteration 5 depth 2
+red count : 2
+blue count : 0
+dead count : 1136
+matched count : 3804
+Iteration 6 depth 2
+red count : 0
+blue count : 0
+dead count : 1136
+matched count : 3806
+Iteration 7 depth 2
+red count : 0
+blue count : 0
+dead count : 1136
+matched count : 3806
+Iteration 8 depth 2
+post augment match is valid
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Blossom bridge pair   1287-1294
+Contracting Blossom bridge pair   311-310
+finding base   311-270
+finding base   310-312
+finding base   311-270
+finding base   310-312
+finding base   270-316
+finding base   312-316
+setting base   316base[316] = 316
+setting base   311-270
+setting base   310-312
+setting base   270-316
+setting base   312-316
+Contracting Blossom bridge pair   1294-1287
+finding base   1294-1432
+finding base   1287-1286
+finding base   1294-1432
+finding base   1287-1286
+finding base   1432-1292
+finding base   1286-1292
+setting base   1292base[1292] = 1292
+setting base   1294-1432
+setting base   1287-1286
+setting base   1432-1292
+setting base   1286-1292
+Contracting Blossom bridge pair   200-182
+finding base   200-113
+finding base   182-181
+finding base   200-113
+finding base   182-181
+finding base   113-183
+finding base   181-183
+setting base   183base[183] = 183
+setting base   200-113
+setting base   182-181
+setting base   113-183
+setting base   181-183
+Contracting Blossom bridge pair   4413-4412
+finding base   4413-4411
+u 1292 base_u 1292
+1292->1286
+1286->1287
+1287->1294
+1294->1432
+1432->1292
+u 4409 base_u 4409
+4409->4410
+4410->4412
+4412->4413
+4413->4411
+4411->4409
+u 4119 base_u 4119
+4119->4118
+4118->4120
+4120->4138
+4138->4137
+4137->4119
+u 183 base_u 183
+183->181
+181->182
+182->200
+200->113
+113->183
+u 316 base_u 316
+316->312
+312->310
+310->311
+311->270
+270->316
+BFS SUCCESS!!!
+red count : 0
+blue count : 0
+dead count : 1136
+matched count : 3806
+Iteration 0 depth 3
+post augment match is valid
+BFS SUCCESS!!!
+red count : 7
+blue count : 8
+dead count : 1121
+matched count : 3806
+Iteration 0 depth 4
+red count : 7
+blue count : 2
+dead count : 1121
+matched count : 3812
+Iteration 1 depth 4
+red count : 3
+blue count : 2
+dead count : 1121
+matched count : 3816
+Iteration 2 depth 4
+red count : 2
+blue count : 0
+dead count : 1122
+matched count : 3818
+Iteration 3 depth 4
+red count : 0
+blue count : 0
+dead count : 1122
+matched count : 3820
+Iteration 4 depth 4
+red count : 0
+blue count : 0
+dead count : 1122
+matched count : 3820
+Iteration 5 depth 4
+post augment match is valid
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Blossom bridge pair   2474-2299
+Contracting Blossom bridge pair   2299-2474
+Contracting Blossom bridge pair   2308-2306
+finding base   2299-2340
+finding base   2308-2307
+finding base   2474-2333
+finding base   2306-2304
+finding base   2299-2340
+finding base   2308-2307
+finding base   2474-2333
+finding base   2306-2304
+finding base   2340-2337
+finding base   2307-2309
+finding base   2333-2331
+finding base   2304-2305
+finding base   2337-2336
+finding base   2309-466
+finding base   2331-2332
+finding base   2305-2441
+finding base   2336-2338
+finding base   466-2341
+finding base   2332-2338
+finding base   2441-2341
+setting base   2338base[2338] = 2338
+setting base   2341base[2341] = 2341
+setting base   2299-2340
+setting base   2308-2307
+setting base   2474-2333
+setting base   2306-2304
+setting base   2340-2337
+setting base   2307-2309
+setting base   2333-2331
+setting base   2304-2305
+setting base   2337-2336
+setting base   2309-466
+setting base   2331-2332
+setting base   2305-2441
+setting base   2336-2338
+setting base   466-2341
+u 2338 base_u 2338
+u 2341 base_u 2341
+2338->2332
+2341->2441
+2332->2331
+2441->2305
+2331->2333
+2305->2304
+2333->2474
+2304->2306
+2474->2299
+2306->2308
+2299->2340
+2308->2307
+2340->2337
+2307->2309
+2337->2336
+2309->466
+2336->2338
+466->2341
+BFS SUCCESS!!!
+red count : 0
+blue count : 0
+dead count : 1122
+matched count : 3820
+Iteration 0 depth 5
+post augment match is valid
+BFS SUCCESS!!!
+red count : 0
+blue count : 0
+dead count : 1120
+matched count : 3822
+Iteration 0 depth 6
+red count : 0
+blue count : 0
+dead count : 1120
+matched count : 3822
+Iteration 1 depth 6
+post augment match is valid
+BFS SUCCESS!!!
+red count : 0
+blue count : 0
+dead count : 1120
+matched count : 3822
+Iteration 0 depth 7
+post augment match is valid
+BFS SUCCESS!!!
+red count : 0
+blue count : 0
+dead count : 1120
+matched count : 3822
+Iteration 0 depth 8
+post augment match is valid
+BFS SUCCESS!!!
+red count : 0
+blue count : 0
+dead count : 1120
+matched count : 3822
+Iteration 0 depth 9
+post augment match is valid
+BFS SUCCESS!!!
+red count : 0
+blue count : 0
+dead count : 1120
+matched count : 3822
+Iteration 0 depth 10
+post augment match is valid
+BFS SUCCESS!!!
+red count : 0
+blue count : 0
+dead count : 1120
+matched count : 3822
+Iteration 0 depth 11
+post augment match is valid
+BFS SUCCESS!!!
+red count : 0
+blue count : 0
+dead count : 1120
+matched count : 3822
+Iteration 0 depth 12
+post augment match is valid
+BFS SUCCESS!!!
+red count : 0
+blue count : 0
+dead count : 1120
+matched count : 3822
+Iteration 0 depth 13
+post augment match is valid
+
+Number zero dist vertices is : 1270
+
+Elapsed Time for SYCL BFS: 0.619107
+
+Outer Iteration 0
+Num degree zero vertices 1
+CATASTROPHIC ERROR! PRED EDGE 183 - 182 DNE
+CATASTROPHIC ERROR! PRED EDGE 183 - 200 DNE
+CATASTROPHIC ERROR! PRED EDGE 316 - 310 DNE
+CATASTROPHIC ERROR! PRED EDGE 316 - 311 DNE
+CATASTROPHIC ERROR! PRED EDGE 1292 - 1287 DNE
+CATASTROPHIC ERROR! PRED EDGE 1292 - 1294 DNE
+CATASTROPHIC ERROR! PRED EDGE 2338 - 2299 DNE
+CATASTROPHIC ERROR! PRED EDGE 2341 - 2304 DNE
+CATASTROPHIC ERROR! PRED EDGE 2341 - 2305 DNE
+CATASTROPHIC ERROR! PRED EDGE 2341 - 2306 DNE
+CATASTROPHIC ERROR! PRED EDGE 2341 - 2307 DNE
+CATASTROPHIC ERROR! PRED EDGE 2341 - 2308 DNE
+CATASTROPHIC ERROR! PRED EDGE 2341 - 2309 DNE
+CATASTROPHIC ERROR! PRED EDGE 2338 - 2331 DNE
+CATASTROPHIC ERROR! PRED EDGE 2338 - 2333 DNE
+CATASTROPHIC ERROR! PRED EDGE 2338 - 2337 DNE
+CATASTROPHIC ERROR! PRED EDGE 2338 - 2340 DNE
+CATASTROPHIC ERROR! PRED EDGE 2338 - 2474 DNE
+CATASTROPHIC ERROR! PRED EDGE 4119 - 4120 DNE
+CATASTROPHIC ERROR! PRED EDGE 4119 - 4138 DNE
+CATASTROPHIC ERROR! PRED EDGE 4409 - 4412 DNE
+CATASTROPHIC ERROR! PRED EDGE 4409 - 4413 DNE
+BFS FAIL!!!

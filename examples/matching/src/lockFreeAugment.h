@@ -52,6 +52,7 @@ void augment_bridges(sycl::queue &q,
                 sycl::buffer<int> &match,
                 sycl::buffer<int> &requests,
                 sycl::buffer<bool> &matchable,
+                sycl::buffer<bool> &ineligible,
                 const int vertexNum){
 
 
@@ -546,6 +547,8 @@ void augment_bridges(sycl::queue &q,
 
         auto dist_i = dist.get_access<read_t>(h);
         auto pred_i = pred.get_access<read_t>(h);
+        auto ineligible_i = ineligible.get_access<write_t>(h);
+
     sycl::stream out(1024, 256, h);
 
         h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
@@ -560,7 +563,7 @@ void augment_bridges(sycl::queue &q,
                             // are newly matched vertices, thus we need to augment them.
                             if (matchable_i[src] || dist_i[src] != 0 || match_i[src]<4)
                                 return; 
-
+                            ineligible_i[srcStart] = true;
                             auto edgePair = b_i[src];
                             uint32_t leastSignificantWord = (uint32_t)edgePair;
                             uint32_t mostSignificantWord = (edgePair >> 32);
@@ -1073,6 +1076,7 @@ bool contract_blossoms(sycl::queue &q,
                 sycl::buffer<int> &base,
                 sycl::buffer<int> &forward,
                 sycl::buffer<int> &backward,
+                sycl::buffer<bool> &ineligible,
                 const int vertexNum){
 
 
@@ -1236,13 +1240,15 @@ bool contract_blossoms(sycl::queue &q,
     auto base_i = base.get_access<write_t>(h);
     auto for_i = forward.get_access<write_t>(h);
     auto back_i = backward.get_access<write_t>(h);
+    auto ineligible_i = ineligible.get_access<write_t>(h);
+
     sycl::stream out(1024, 256, h);
 
     h.parallel_for(VertexSize,
                     [=](sycl::id<1> i) { 
         if (!matchable_i[i] || dist_i[i] != 0 || b_i[i] == 0)
             return; 
-
+        ineligible_i[i] = true;
         auto edgePair = b_i[i];
         uint32_t leastSignificantWord = (uint32_t)edgePair;
         uint32_t mostSignificantWord = (edgePair >> 32);

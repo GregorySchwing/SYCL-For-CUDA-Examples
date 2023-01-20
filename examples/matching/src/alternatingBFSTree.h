@@ -264,6 +264,7 @@ void alternatingBFSTree(sycl::queue &q,
   sycl::buffer<bool> expanded{Singleton};
   sycl::buffer<int> dzs{Singleton};
   sycl::buffer<int> depth{Singleton};
+  sycl::buffer<bool> ineligible{VertexSize};
 
 
   // Initialize input data
@@ -286,6 +287,8 @@ void alternatingBFSTree(sycl::queue &q,
     auto dep = depth.get_access<dwrite_t>();
     auto exp = expanded.get_access<dwrite_t>();
     auto b_i = bridgeVertex.get_access<dwrite_t>();
+    auto ineligible_i = ineligible.get_access<dwrite_t>();
+
     
     dzs_i[0] = 0;
     for (int i = 0; i < vertexNum; i++) {
@@ -299,6 +302,7 @@ void alternatingBFSTree(sycl::queue &q,
       b_i[i] = 0;
       s[i] = i;
       p[i] = i;
+      ineligible_i[i] = false;
     }
     dep[0] = -1;
     exp[0] = 0;
@@ -344,7 +348,8 @@ void alternatingBFSTree(sycl::queue &q,
       auto pred_i = pred.get_access<write_t>(h);
       auto base_i = base.get_access<read_t>(h);
       auto for_i = forward.get_access<read_t>(h);
-
+      auto ineligible_i = ineligible.get_access<read_t>(h);
+      auto start_i = start.get_access<read_t>(h);
 
       h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
                         sycl::group<1> gr = item.get_group();
@@ -355,7 +360,9 @@ void alternatingBFSTree(sycl::queue &q,
                         //printf("hellow from item %lu thread %lu gr %lu w range %lu \n", item.get_global_linear_id(), threadIdx, src, r[0]);
                         
                         // Not a frontier vertex
-                        if (dist_i[src] != depth_i[0]) return;
+                        // Ineligible vertices are those which are sources at a vertex which has been augmented
+                        // or those newly contracted into a blossom.
+                        if (dist_i[src] != depth_i[0] || ineligible_i[src] || ineligible_i[start_i[src]] ) return;
 
                         if (depth_i[0] % 2 == 0){
                           for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
@@ -373,6 +380,7 @@ void alternatingBFSTree(sycl::queue &q,
                                   auto curr_u = col;
                                   do{
                                     dist_i[curr_u] = dist_i[src] + 1;
+                                    // not sure about this line
                                     pred_i[curr_u] = src;
                                     curr_u = for_i[curr_u];
                                   } while(curr_u != base);
@@ -393,6 +401,7 @@ void alternatingBFSTree(sycl::queue &q,
                                   auto curr_u = col;
                                   do{
                                     dist_i[curr_u] = dist_i[src] + 1;
+                                    // not sure about this line
                                     pred_i[curr_u] = src;
                                     curr_u = for_i[curr_u];
                                   } while(curr_u != base);
@@ -461,6 +470,7 @@ void alternatingBFSTree(sycl::queue &q,
       const auto read_t = sycl::access::mode::read;
       // If depth is even, new frontier is odd, check for trivials
       auto dep = depth.get_access<read_t>();
+      /*
       if (dep[0] % 2 == 0){
         printf("Frontier is odd!\n");
         augment_trivial_paths(q, 
@@ -472,6 +482,7 @@ void alternatingBFSTree(sycl::queue &q,
                               match,
                               vertexNum);  
       }
+      */
       // Match free to each other through bridges (red/blue).
       augment_bridges(q, 
           g,
@@ -486,7 +497,9 @@ void alternatingBFSTree(sycl::queue &q,
           match,
           requests,
           matchable,
+          ineligible,
           vertexNum);
+      
       // Contract blossoms
       blossomsContracted = contract_blossoms(q, 
                                           matchCount,
@@ -503,6 +516,7 @@ void alternatingBFSTree(sycl::queue &q,
                                           base,
                                           forward,
                                           backward,
+                                          ineligible,
                                           vertexNum);
     }
     {
