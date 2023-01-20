@@ -333,26 +333,24 @@ void alternatingBFSTree(sycl::queue &q,
           matchable,
           ineligible,
           vertexNum);
-      
+            */
+
+      // Contract blossoms
       // Contract blossoms
       blossomsContracted = contract_blossoms(q, 
                                           matchCount,
                                           rows, 
                                           cols, 
-                                          bridgeVertex,
                                           pred,
                                           dist,
                                           start,
                                           depth,
                                           match,
-                                          requests,
-                                          matchable,
                                           base,
                                           forward,
                                           backward,
-                                          ineligible,
+                                          inb,
                                           vertexNum);
-      */
 
     }
     {
@@ -695,26 +693,23 @@ void testAlternatingBFSTree(sycl::queue &q,
           matchable,
           ineligible,
           vertexNum);
-      
+
       // Contract blossoms
       blossomsContracted = contract_blossoms(q, 
                                           matchCount,
                                           rows, 
                                           cols, 
-                                          bridgeVertex,
                                           pred,
                                           dist,
                                           start,
                                           depth,
                                           match,
-                                          requests,
-                                          matchable,
                                           base,
                                           forward,
                                           backward,
-                                          ineligible,
+                                          inb,
                                           vertexNum);
-      */
+            */
 
     }
     {
