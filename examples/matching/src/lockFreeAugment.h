@@ -52,6 +52,9 @@ void augment_bridges(sycl::queue &q,
                 sycl::buffer<int> &match,
                 sycl::buffer<int> &requests,
                 sycl::buffer<bool> &matchable,
+                sycl::buffer<int> &base,
+                sycl::buffer<int> &forward,
+                sycl::buffer<int> &backward,
                 const int vertexNum){
 
 
@@ -546,6 +549,7 @@ void augment_bridges(sycl::queue &q,
 
         auto dist_i = dist.get_access<read_t>(h);
         auto pred_i = pred.get_access<read_t>(h);
+        auto base_i = base.get_access<read_t>(h);
     sycl::stream out(1024, 256, h);
 
         h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
@@ -583,6 +587,10 @@ void augment_bridges(sycl::queue &q,
                                     out << "CATASTROPHIC ERROR! BRIDGE EDGE  " << curr_u << "-" << curr_v << " DNE" <<  cl::sycl::endl;
                                     //printf("CATASTROPHIC ERROR! BRIDGE EDGE %u - %u DNE\n", curr_u, curr_v);
 
+                                if (base_i[curr_u] != -1 || base_i[curr_v] != -1){
+                                    out << "MATCHING THROUGH A BLOSSOM  " << curr_u << " base[" << curr_u << "] = " << base_i[curr_u] <<  cl::sycl::endl;
+                                    out << "MATCHING THROUGH A BLOSSOM  " << curr_v << " base[" << curr_v << "] = " << base_i[curr_v] <<  cl::sycl::endl;
+                                }
                                 match_i[curr_u] = 4+curr_v;
                                 match_i[curr_v] = 4+curr_u;
                             }
@@ -600,6 +608,9 @@ void augment_bridges(sycl::queue &q,
                                 if (curr_depth % 2 == 1){
                                     match_i[curr_u] = 4 + parent_u;
                                     match_i[parent_u] = 4 + curr_u;
+                                    if (base_i[curr_u] != -1){
+                                        out << "MATCHING THROUGH A BLOSSOM  " << curr_u << " base[" << curr_u << "] = " << base_i[curr_u] <<  cl::sycl::endl;
+                                    }
                                 }
                                 curr_u = parent_u;
                             }
@@ -1004,17 +1015,18 @@ bool contract_blossoms_2(sycl::queue &q,
                             curr_v = mostSignificantWord;
                             parent_u = pred_i[curr_u];
                             parent_v = pred_i[curr_v];
+        
                             while(curr_u != curr_v){
                                 out << "setting base   " << curr_u << "-" << parent_u  <<  cl::sycl::endl;
                                 out << "setting base   " << curr_v << "-" << parent_v  <<  cl::sycl::endl;
-                                
+
                                 base_i[curr_u]=base;
                                 base_i[curr_v]=base;
                                 curr_u  = parent_u;
                                 curr_v  = parent_v;
                                 parent_u = pred_i[curr_u];
                                 parent_v = pred_i[curr_v];
-//printf("curr_u %u curr_v %u base %u base %u\n", curr_u,curr_v,base,base);
+
                             }
                         }
 
@@ -1043,8 +1055,7 @@ bool contract_blossoms_2(sycl::queue &q,
                 out << "u " << i[0] << " base_u " << base_u  <<  cl::sycl::endl;
                 while(for_i[curr_ut] != base_u){
                     //printf("%d -> %d\n", curr_ut, for_i[curr_ut]);
-                        out << curr_ut << "->" << curr_ut  <<  cl::sycl::endl;
-
+                    out << curr_ut << "->" << curr_ut  <<  cl::sycl::endl;
                     curr_ut = for_i[curr_ut];
                 }
 

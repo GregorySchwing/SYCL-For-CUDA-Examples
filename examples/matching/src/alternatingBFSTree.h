@@ -437,9 +437,10 @@ void alternatingBFSTree(sycl::queue &q,
 
       auto m = match.get_access<read_t>();
       auto pred_i = pred.get_access<read_t>();
-
+      auto base_i = base.get_access<read_t>();
       for (int i = 0; i < g.vertexNum; i++) {
-        if (pred_i[i] != i  && !g.has(pred_i[i], i)){
+        // Don't check that edges in a blossom exist, since I jump from a v to all b
+        if (pred_i[i] != i  && !g.has(pred_i[i], i) && base_i[i]==-1){
           printf("CATASTROPHIC ERROR! PRED EDGE %u - %u DNE\n",pred_i[i],i);
           bad = true;
         }
@@ -486,6 +487,9 @@ void alternatingBFSTree(sycl::queue &q,
           match,
           requests,
           matchable,
+          base,
+          forward,
+          backward,
           vertexNum);
       // Contract blossoms
       blossomsContracted = contract_blossoms(q, 

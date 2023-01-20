@@ -1,0 +1,9 @@
+
+Graph file: ../../../test/test_graphs/Power-Grid.txt
+UUID: 1
+finished checking
+Running on Intel(R) Xeon(R) W-10885M CPU @ 2.40GHz
+Selected device : Intel(R) Xeon(R) W-10885M CPU @ 2.40GHz
+
+Elapsed Time for Serial edmonds Max Match: 0.007905
+Serial max matching count : 2171

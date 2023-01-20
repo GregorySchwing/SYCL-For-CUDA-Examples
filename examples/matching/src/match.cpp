@@ -27,6 +27,8 @@
 #include "alternatingBFSTree.h"
 #include "match.h"
 #include "edmondsSerial.h"
+#include "edmondsParallel.h"
+
 //#include "atomicAugment.h"
 //#include "lockFreeAugment.h"
 
@@ -62,14 +64,14 @@ int main(int argc, char *argv[]) {
   sycl::buffer<int> degree{graph.degree, VertexSize};
   sycl::buffer<int> depth{Singleton};
 
-
+  /*
   // Device output vector
   sycl::buffer<int> match{VertexSize};
   // Intermediate vector
   sycl::buffer<int> requests{VertexSize};
   // Two uint32's are packed into a space.  This way we avoid atomics.
   sycl::buffer<uint64_t> bridgeVertex{VertexSize};
-
+  */
   auto CUDASelector = [](sycl::device const &dev) {
     if (dev.get_platform().get_backend() == sycl::backend::ext_oneapi_cuda) {
       std::cout << " CUDA device found " << std::endl;
@@ -97,7 +99,7 @@ int main(int argc, char *argv[]) {
   sycl::nd_range<1> test{NumWorkItems, WorkGroupSize};
   //printf("get_local_range %lu get_global_range %lu get_group_range %lu \n", test.get_local_range()[0],  test.get_global_range()[0],  test.get_group_range()[0]);
 
-
+/*
   chrono::time_point<std::chrono::system_clock> begin, end;
 	std::chrono::duration<double> elapsed_seconds_max, elapsed_seconds_edge, elapsed_seconds_mvc;
 
@@ -232,18 +234,7 @@ int main(int argc, char *argv[]) {
     // resources.
     chrono::time_point<std::chrono::system_clock> BFS_begin, BFS_end;
     BFS_begin = std::chrono::system_clock::now(); 
-    /*
-    alternatingBFSTree(myQueue, 
-                      rows, 
-                      cols, 
-                      dist,
-                      pred,
-                      start,
-                      depth,
-                      degree,
-                      match,
-                      graph.vertexNum);
-    */
+
 
     alternatingBFSTree(myQueue,
                       graph,
@@ -267,116 +258,10 @@ int main(int argc, char *argv[]) {
     elapsed_seconds_max = BFS_end - BFS_begin; 
     printf("\nElapsed Time for SYCL BFS: %f\n",elapsed_seconds_max.count());
     
-    /*
-
-    chrono::time_point<std::chrono::system_clock> augment_begin, augment_end;
-    augment_begin = std::chrono::system_clock::now(); 
-    //int syclmatchc = 0;
-
-    atomicAugment_a(myQueue, 
-              currentMatchc,
-              rows, 
-              cols, 
-              pred,
-              dist,
-              start,
-              depth,
-              match,
-              requests,
-              bridgeVertex,
-              graph.vertexNum);
-    
-    augment_end = std::chrono::system_clock::now(); 
-    elapsed_seconds_max = augment_end - augment_begin; 
-    printf("\nElapsed Time for SYCL augment_a: %f\n",elapsed_seconds_max.count());
-    printf("\nSYCL augment size: %d\n",currentMatchc/2);
-
-    chrono::time_point<std::chrono::system_clock> augment_b_begin, augment_b_end;
-    augment_b_begin = std::chrono::system_clock::now(); 
-
-    atomicAugment_b(myQueue, 
-                currentMatchc,
-                rows, 
-                cols, 
-                start,
-                pred,
-                dist,
-                match,
-                bridgeVertex,
-                graph.vertexNum);
-
-    augment_b_end = std::chrono::system_clock::now(); 
-    elapsed_seconds_max = augment_b_end - augment_b_begin; 
-    printf("\nElapsed Time for SYCL augment_b: %f\n",elapsed_seconds_max.count());
-    printf("\nSYCL augment size: %d\n",currentMatchc/2);
-    */
-
-    /*
-    // To identify one and only one Augmenting path 
-    // to use the starting v.
-    // Both of these are only neccessary in the data-parallel
-    // version.  If a single work-group performs the matching,
-    // these can be eliminated by work item synchronization.
-    sycl::buffer<int> winningAugmentingPath{VertexSize};
-    sycl::buffer<int> auxMatch{VertexSize};
-
-    // Match inside even levels > 0 to avoid race conditions
-    // in blossoms/augmenting paths.  For example consider a 
-    // cycle represented by a circular linked list of odd length n.
-    // If each vertex in the level tried creating an augmenting path 
-    // with its rightside vertex, the entire level would augment, 
-    // but at (2/3)n can be in an forest of disjoint augmenting paths.
-
-    // This kernel should be modified for use in a search tree.
-    chrono::time_point<std::chrono::system_clock> aux_matching_begin, aux_matching_end;
-    aux_matching_begin = std::chrono::system_clock::now(); 
-    maximalMatching(myQueue, 
-                    rows, 
-                    cols, 
-                    requests,
-                    match,
-                    dist,
-                    depth,
-                    auxMatch,
-                    graph.vertexNum,
-                    config.barrier);
-
-    aux_matching_end = std::chrono::system_clock::now(); 
-    elapsed_seconds_max = aux_matching_end - aux_matching_begin; 
-    printf("\nElapsed Time for SYCL Aux matching: %f\n",elapsed_seconds_max.count());
-    
-    chrono::time_point<std::chrono::system_clock> augment_begin, augment_end;
-    augment_begin = std::chrono::system_clock::now(); 
-    int syclmatchc = 0;
-    augment_a(myQueue, 
-              syclmatchc,
-              rows, 
-              cols, 
-              pred,
-              dist,
-              start,
-              depth,
-              match,
-              auxMatch,
-              winningAugmentingPath,
-              graph.vertexNum);
-    
-    augment_end = std::chrono::system_clock::now(); 
-    elapsed_seconds_max = augment_end - augment_begin; 
-    printf("\nElapsed Time for SYCL augment: %f\n",elapsed_seconds_max.count());
-    */
     printf("\nOuter Iteration %d\n",iteration++);
   } while (prevMatchc != currentMatchc); 
 
     
-
-
-  /*
-  int matchc =  edmonds(myQueue, 
-                      rows, 
-                      cols, 
-                      vertexNum);
-  */
 
   // detect and shrink blossoms
   // If there is no stem, s.t. r = start
@@ -447,14 +332,41 @@ int main(int argc, char *argv[]) {
   printf("\nElapsed Time for SYCL Max Match: %f\n",elapsed_seconds_max.count());
   printf("SYCL match count is: %u\n", currentMatchc/2);
   fflush(stdout);
+*/
+
   // Test matching against serial edmonds
-  begin = std::chrono::system_clock::now(); 
   EdmondsSerial e(graph);
+
+
+  sycl::buffer<int> match{VertexSize};
+  sycl::buffer<int> q{VertexSize};
+  sycl::buffer<int> father{VertexSize};
+  sycl::buffer<int> base{VertexSize};
+  sycl::buffer<bool> inq{VertexSize};
+  sycl::buffer<bool> inb{VertexSize};
+
+  EdmondsParallel ep(graph,
+                    match,q,father,base,inq,inb);
+
+  chrono::time_point<std::chrono::system_clock> begin, end;
+
+  begin = std::chrono::system_clock::now(); 
   int matchc = e.edmonds();
   end = std::chrono::system_clock::now(); 
+	std::chrono::duration<double> elapsed_seconds_max;
+
 	elapsed_seconds_max = end - begin; 
   // matchc is number of matched edges
   printf("\nElapsed Time for Serial edmonds Max Match: %f\n",elapsed_seconds_max.count());
   printf("Serial max matching count : %d\n", matchc);
+
+  begin = std::chrono::system_clock::now(); 
+  matchc = ep.edmonds();
+  end = std::chrono::system_clock::now(); 
+
+	elapsed_seconds_max = end - begin; 
+  // matchc is number of matched edges
+  printf("\nElapsed Time for Parallel edmonds Max Match: %f\n",elapsed_seconds_max.count());
+  printf("Parallel max matching count : %d\n", matchc);
   return 0;
 }
