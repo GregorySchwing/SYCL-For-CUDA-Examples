@@ -1002,8 +1002,8 @@ bool contract_blossoms(sycl::queue &q,
             const auto read_t = sycl::access::mode::read;
 
             // dist
-            auto base_i = base.get_access<read_write_t>(h);
-            auto for_i = forward.get_access<write_t>(h);
+            auto base_i = base.get_access<read_t>(h);
+            auto for_i = forward.get_access<read_t>(h);
 
             h.parallel_for(VertexSize,
                             [=](sycl::id<1> i) { 
