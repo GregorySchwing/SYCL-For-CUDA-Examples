@@ -998,7 +998,7 @@ bool contract_blossoms(sycl::queue &q,
         // Color vertices
         // Request vertices - one workitem per workgroup
         // Command Group creation
-        auto cg = [&](sycl::handler &h) {    
+        auto cg9 = [&](sycl::handler &h) {    
             const auto read_t = sycl::access::mode::read;
 
             // dist
@@ -1019,6 +1019,7 @@ bool contract_blossoms(sycl::queue &q,
 
             });
     };
+    q.submit(cg9);
     {
         const auto read_t = sycl::access::mode::read;
         auto km = keepMatching.get_access<read_t>();
