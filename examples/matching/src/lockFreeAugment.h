@@ -546,6 +546,7 @@ void augment_bridges(sycl::queue &q,
 
         auto dist_i = dist.get_access<read_t>(h);
         auto pred_i = pred.get_access<read_t>(h);
+    sycl::stream out(1024, 256, h);
 
         h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
                             sycl::group<1> gr = item.get_group();
@@ -564,8 +565,8 @@ void augment_bridges(sycl::queue &q,
                             uint32_t leastSignificantWord = (uint32_t)edgePair;
                             uint32_t mostSignificantWord = (edgePair >> 32);
 
-                            if (start_i[leastSignificantWord] != src)
-                                printf("CATASTROPHIC ERROR! %u != %d\n", start_i[leastSignificantWord], src);
+                            //if (start_i[leastSignificantWord] != src)
+                                //printf("CATASTROPHIC ERROR! %u != %d\n", start_i[leastSignificantWord], src);
 
                             uint32_t curr_u = leastSignificantWord;
                             uint32_t curr_v = mostSignificantWord;
@@ -579,7 +580,8 @@ void augment_bridges(sycl::queue &q,
                                     has |= curr_v == col;                           
                                 }
                                 if (!has)
-                                    printf("CATASTROPHIC ERROR! BRIDGE EDGE %u - %u DNE\n", curr_u, curr_v);
+                                    out << "CATASTROPHIC ERROR! BRIDGE EDGE  " << curr_u << "-" << curr_v << " DNE" <<  cl::sycl::endl;
+                                    //printf("CATASTROPHIC ERROR! BRIDGE EDGE %u - %u DNE\n", curr_u, curr_v);
 
                                 match_i[curr_u] = 4+curr_v;
                                 match_i[curr_v] = 4+curr_u;
@@ -593,7 +595,8 @@ void augment_bridges(sycl::queue &q,
                                     has |= parent_u == col;                           
                                 }
                                 if (!has)
-                                    printf("CATASTROPHIC ERROR! PRED EDGE %u - %u DNE\n", curr_u, curr_v);
+                                    out << "CATASTROPHIC ERROR! PRED EDGE  " << curr_u << "-" << curr_v << " DNE" <<  cl::sycl::endl;
+                                //    printf("CATASTROPHIC ERROR! PRED EDGE %u - %u DNE\n", curr_u, curr_v);
                                 if (curr_depth % 2 == 1){
                                     match_i[curr_u] = 4 + parent_u;
                                     match_i[parent_u] = 4 + curr_u;
@@ -739,6 +742,8 @@ void augment_trivial_paths(sycl::queue &q,
     sycl::buffer<unsigned int> colsum {Tripleton};
 
     auto cg = [&](sycl::handler &h) {    
+    sycl::stream out(1024, 256, h);
+
     const auto dwrite_t = sycl::access::mode::discard_write;
     const auto read_t = sycl::access::mode::read;
     const auto write_t = sycl::access::mode::write;
@@ -751,7 +756,9 @@ void augment_trivial_paths(sycl::queue &q,
                     [=](sycl::id<1> i) { 
         if (dist_i[i] != dep[0] + 1 || match_i[i] >= 4)
             return;
-        printf("Trivial path candidate %lu %d\n!", i[0], start_i[i]);
+        //printf("Trivial path candidate %lu %d\n!", i[0], start_i[i]);
+        out << "Trivial path candidate   " << i[0] << "-" << start_i[i]  <<  cl::sycl::endl;
+
     });
     };
     q.submit(cg);
@@ -848,6 +855,7 @@ bool contract_blossoms(sycl::queue &q,
 
     auto dist_i = dist.get_access<read_t>(h);
     auto pred_i = pred.get_access<read_t>(h);
+    sycl::stream out(1024, 256, h);
 
     h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
                         sycl::group<1> gr = item.get_group();
@@ -883,7 +891,7 @@ bool contract_blossoms(sycl::queue &q,
                                         uint32_t mostSignificantWord = col;
                                         uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
                                         b_i[start_i[src]] = edgePair;
-                                        printf("Blossom bridge pair %lu %u\n", src, col);
+                                        out << "Blossom bridge pair   " << src << "-" << col  <<  cl::sycl::endl;
                                         km[0] = true;
                                         return;
                                     }
@@ -906,7 +914,8 @@ bool contract_blossoms(sycl::queue &q,
                                     uint32_t mostSignificantWord = col;
                                     uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
                                     b_i[start_i[src]] = edgePair;
-                                    printf("Blossom bridge pair %lu %u\n", src, col);
+                                    //printf("Blossom bridge pair %lu %u\n", src, col);
+                                    out << "Blossom bridge pair   " << src << "-" << col  <<  cl::sycl::endl;
                                     km[0] = true;
                                     return;
                                 }
@@ -939,6 +948,8 @@ bool contract_blossoms(sycl::queue &q,
     auto base_i = base.get_access<write_t>(h);
     auto for_i = forward.get_access<write_t>(h);
     auto back_i = backward.get_access<write_t>(h);
+        sycl::stream out(1024, 256, h);
+
     h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
                         sycl::group<1> gr = item.get_group();
                         sycl::range<1> ra = gr.get_local_range();
@@ -956,41 +967,50 @@ bool contract_blossoms(sycl::queue &q,
                         if (leastSignificantWord != src)
                             return;
 
-                        printf("Blossom bridge %u %u\n", leastSignificantWord, mostSignificantWord);
-                        uint32_t curr_u = leastSignificantWord;
-                        uint32_t curr_v = mostSignificantWord;
-                        auto parent_u = pred_i[curr_u];
-                        auto parent_v = pred_i[curr_v];
-                        printf("curr_u %u curr_v %u parent_u %u parent_v %u\n", curr_u, curr_v,parent_u,parent_v);
-                        for_i[curr_u]=curr_v;
-                        back_i[curr_v]=curr_u;
+                        if (threadIdx == 0){    
+                            out << "contracting Blossom bridge pair   " << leastSignificantWord << "-" << mostSignificantWord  <<  cl::sycl::endl;
 
-                        while(curr_u != curr_v){
-                            back_i[curr_u]=parent_u;
-                            for_i[curr_v]=parent_v;
-                            curr_u  = parent_u;
-                            curr_v  = parent_v;
+                            uint32_t curr_u = leastSignificantWord;
+                            uint32_t curr_v = mostSignificantWord;
+                            auto parent_u = pred_i[curr_u];
+                            auto parent_v = pred_i[curr_v];
+                            for_i[curr_u]=curr_v;
+                            back_i[curr_v]=curr_u;
+
+                            while(curr_u != curr_v){
+                                out << "finding base   " << curr_u << "-" << parent_u  <<  cl::sycl::endl;
+                                out << "finding base   " << curr_v << "-" << parent_v  <<  cl::sycl::endl;
+
+                                back_i[curr_u]=parent_u;
+                                for_i[curr_v]=parent_v;
+                                curr_u  = parent_u;
+                                curr_v  = parent_v;
+                                parent_u = pred_i[curr_u];
+                                parent_v = pred_i[curr_v];
+
+                                //printf("curr_u %u curr_v %u parent_u %u parent_v %u\n", curr_u,curr_v,parent_u,parent_v);
+                            }
+
+                            auto base = curr_u;
+                            base_i[base] = base;
+
+                            curr_u = leastSignificantWord;
+                            curr_v = mostSignificantWord;
                             parent_u = pred_i[curr_u];
                             parent_v = pred_i[curr_v];
-                            //printf("curr_u %u curr_v %u parent_u %u parent_v %u\n", curr_u,curr_v,parent_u,parent_v);
+                            while(curr_u != curr_v){
+                                out << "setting base   " << curr_u << "-" << parent_u  <<  cl::sycl::endl;
+                                out << "setting base   " << curr_v << "-" << parent_v  <<  cl::sycl::endl;
+                                
+                                base_i[curr_u]=base;
+                                base_i[curr_v]=base;
+                                curr_u  = parent_u;
+                                curr_v  = parent_v;
+                                parent_u = pred_i[curr_u];
+                                parent_v = pred_i[curr_v];
+//printf("curr_u %u curr_v %u base %u base %u\n", curr_u,curr_v,base,base);
+                            }
                         }
-
-                        auto base = curr_u;
-                        base_i[base] = base;
-                        curr_u = leastSignificantWord;
-                        curr_v = mostSignificantWord;
-                        parent_u = pred_i[curr_u];
-                        parent_v = pred_i[curr_v];
-                        while(curr_u != curr_v){
-                            base_i[curr_u]=base;
-                            base_i[curr_v]=base;
-                            curr_u  = parent_u;
-                            curr_v  = parent_v;
-                            parent_u = pred_i[curr_u];
-                            parent_v = pred_i[curr_v];
-                            //printf("curr_u %u curr_v %u base %u base %u\n", curr_u,curr_v,base,base);
-                        }
-
 
     });
     };
@@ -1000,6 +1020,7 @@ bool contract_blossoms(sycl::queue &q,
         // Command Group creation
         auto cg9 = [&](sycl::handler &h) {    
             const auto read_t = sycl::access::mode::read;
+    sycl::stream out(1024, 256, h);
 
             // dist
             auto base_i = base.get_access<read_t>(h);
@@ -1011,9 +1032,12 @@ bool contract_blossoms(sycl::queue &q,
                     return;
                 auto base_u = base_i[i];
                 auto curr_ut = base_u;
-                printf("u %u base_u %d\n", i[0], base_u);
+                //printf("u %u base_u %d\n", i[0], base_u);
+                out << "u " << i[0] << " base_u " << base_u  <<  cl::sycl::endl;
                 while(for_i[curr_ut] != base_u){
-                    printf("%d -> %d\n", curr_ut, for_i[curr_ut]);
+                    //printf("%d -> %d\n", curr_ut, for_i[curr_ut]);
+                        out << curr_ut << "->" << curr_ut  <<  cl::sycl::endl;
+
                     curr_ut = for_i[curr_ut];
                 }
 

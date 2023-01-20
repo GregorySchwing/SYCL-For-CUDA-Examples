@@ -27,7 +27,7 @@
 #include "alternatingBFSTree.h"
 #include "match.h"
 #include "edmondsSerial.h"
-#include "atomicAugment.h"
+//#include "atomicAugment.h"
 //#include "lockFreeAugment.h"
 
 #include <CL/sycl.hpp>
