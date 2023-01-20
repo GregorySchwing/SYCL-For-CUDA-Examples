@@ -1116,10 +1116,13 @@ bool contract_blossoms(sycl::queue &q,
 
       auto dist_i = dist.get_access<read_write_t>(h);
       auto pred_i = pred.get_access<write_t>(h);
-      auto base_i = base.get_access<read_t>(h);
-      auto for_i = forward.get_access<read_t>(h);
+
+      auto base_i = base.get_access<read_write_t>(h);
+      auto for_i = forward.get_access<read_write_t>(h);
+      auto back_i = backward.get_access<read_write_t>(h);
+
       auto start_i = start.get_access<read_t>(h);
-      auto inb_i = inb.get_access<read_t>(h);
+      auto inb_i = inb.get_access<read_write_t>(h);
       auto km = keepMatching.get_access<write_t>(h);
 
       sycl::stream out(1024, 256, h);
@@ -1155,23 +1158,42 @@ bool contract_blossoms(sycl::queue &q,
                                 if(match_src.compare_exchange_strong(unmatched, 3, sycl::memory_order::acquire,sycl::memory_order::acquire)){
                                     int u=src,v,w;
                                     out << "contracting blossom bridge pair   " << base_src << "-" << base_col << " srced at " << start_i[base_src] <<  cl::sycl::endl;
+                                    uint32_t curr_u = base_src;
+                                    uint32_t curr_v = base_col;
+                                    auto parent_u = pred_i[curr_u];
+                                    auto parent_v = pred_i[curr_v];
+                                    out << "finding base   " << curr_u << "-" << parent_u  <<  cl::sycl::endl;
+                                    out << "finding base   " << curr_v << "-" << parent_v  <<  cl::sycl::endl;
+                                    back_i[curr_u]=curr_v;
+                                    for_i[curr_v]=curr_u;
 
-                                    /*
-                                    while (u!=-1)
-                                    {
-                                        if(!inb_i[pred_i[u]]){
-                                        v=pred_i[u];
-                                        w=match_i[v]-4;
-                                        match_i[v]=4+u;
-                                        match_i[u]=4+v;
-                                        u=w;
-                                        } else {
-                                        out << "Augmenting a trivial path from " << src << " through blossom vertex " << pred_i[u] << cl::sycl::endl;
-                                        exit(1);
-                                        }
+                                    while(curr_u != curr_v){
+                                        out << "finding base   " << curr_u << "-" << parent_u  <<  cl::sycl::endl;
+                                        out << "finding base   " << curr_v << "-" << parent_v  <<  cl::sycl::endl;
+
+                                        for_i[curr_u]=parent_u;
+                                        back_i[parent_u]=curr_u;
+
+                                        for_i[parent_v]=curr_v;
+                                        back_i[curr_v]=parent_v;
+
+                                        curr_u  = parent_u;
+                                        curr_v  = parent_v;
+
+                                        parent_u = pred_i[curr_u];
+                                        parent_v = pred_i[curr_v];
                                     }
-                                    out << "Augmented trivial path from " << src << " to " << v << cl::sycl::endl;
-                                    */
+                                    out << "base   " << curr_u << cl::sycl::endl;
+                                    auto base = curr_u;
+                                    base_i[base] = base;
+                                    inb_i[base] = true;
+                                    curr_u = base;
+                                    do{
+                                        out << curr_u << "->" << for_i[curr_u]  <<  cl::sycl::endl;
+                                        curr_u = for_i[curr_u];
+                                        base_i[curr_u] = base;
+                                        inb_i[curr_u] = true;
+                                    } while(curr_u != base);
                                 } else {
                                     out << "lost atomic race in contracting blossom bridge pair   " << base_src << "-" << base_col  << " srced at " << start_i[base_src] <<  cl::sycl::endl;
                                 }
@@ -1194,23 +1216,42 @@ bool contract_blossoms(sycl::queue &q,
                                 if(match_src.compare_exchange_strong(unmatched, 3, sycl::memory_order::acquire,sycl::memory_order::acquire)){
                                     int u=src,v,w;
                                     out << "contracting blossom bridge pair   " << base_src << "-" << base_col << " srced at " << start_i[base_src] <<  cl::sycl::endl;
+                                    uint32_t curr_u = base_src;
+                                    uint32_t curr_v = base_col;
+                                    auto parent_u = pred_i[curr_u];
+                                    auto parent_v = pred_i[curr_v];
+                                    out << "finding base   " << curr_u << "-" << parent_u  <<  cl::sycl::endl;
+                                    out << "finding base   " << curr_v << "-" << parent_v  <<  cl::sycl::endl;
+                                    back_i[curr_u]=curr_v;
+                                    for_i[curr_v]=curr_u;
 
-                                    /*
-                                    while (u!=-1)
-                                    {
-                                        if(!inb_i[pred_i[u]]){
-                                        v=pred_i[u];
-                                        w=match_i[v]-4;
-                                        match_i[v]=4+u;
-                                        match_i[u]=4+v;
-                                        u=w;
-                                        } else {
-                                        out << "Augmenting a trivial path from " << src << " through blossom vertex " << pred_i[u] << cl::sycl::endl;
-                                        exit(1);
-                                        }
+                                    while(curr_u != curr_v){
+                                        out << "finding base   " << curr_u << "-" << parent_u  <<  cl::sycl::endl;
+                                        out << "finding base   " << curr_v << "-" << parent_v  <<  cl::sycl::endl;
+
+                                        for_i[curr_u]=parent_u;
+                                        back_i[parent_u]=curr_u;
+
+                                        for_i[parent_v]=curr_v;
+                                        back_i[curr_v]=parent_v;
+
+                                        curr_u  = parent_u;
+                                        curr_v  = parent_v;
+
+                                        parent_u = pred_i[curr_u];
+                                        parent_v = pred_i[curr_v];
                                     }
-                                    out << "Augmented trivial path from " << src << " to " << v << cl::sycl::endl;
-                                    */
+                                    out << "base   " << curr_u << cl::sycl::endl;
+                                    auto base = curr_u;
+                                    base_i[base] = base;
+                                    inb_i[base] = true;
+                                    curr_u = base;
+                                    do{
+                                        out << curr_u << "->" << for_i[curr_u]  <<  cl::sycl::endl;
+                                        curr_u = for_i[curr_u];
+                                        base_i[curr_u] = base;
+                                        inb_i[curr_u] = true;
+                                    } while(curr_u != base);
                                 } else {
                                     out << "lost atomic race in contracting blossom bridge pair   " << base_src << "-" << base_col  << " srced at " << start_i[base_src] <<  cl::sycl::endl;
                                 }
