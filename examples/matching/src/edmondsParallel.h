@@ -38,17 +38,6 @@ class EdmondsParallel {
                     inq(_inq),                    
                     inb(_inb) {
 
-      //inb = sycl::buffer<bool>{VertexSize};
-
-      /*
-      match = (int *)malloc(V * sizeof(int));
-      q = (int *)malloc(V * sizeof(int));
-      father = (int *)malloc(V * sizeof(int));
-      base = (int *)malloc(V * sizeof(int));
-
-      inq = (bool *)malloc(V * sizeof(bool));
-      inb = (bool *)malloc(V * sizeof(bool));
-      */
       
     }
     ~EdmondsParallel(){
@@ -211,9 +200,9 @@ int EdmondsParallel::edmonds()
   int matchc=0;
   //memset(match,-1,V*sizeof(int));
   //for (int u=0;u<V;u++)
-    //if (match[u]==-1)
+    //if (match[u]==-1){
       //matchc+=augment_path(u,find_augmenting_path(u));
-
+    //}
   return matchc;
 }
 #endif
