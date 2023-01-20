@@ -202,22 +202,28 @@ int main(int argc, char *argv[]) {
   // in the forest.  This is necessary to ensure, two
   // augmenting paths don't share a start -> blossom
   // This isn't strictly neccessary since we can bt.
+  // Equivalent of root argument.
   sycl::buffer<int> start{VertexSize};
 
   // For the augmenting methods
   sycl::buffer<bool> matchable{VertexSize};
 
   sycl::buffer<int> base{VertexSize};
+  sycl::buffer<bool> inb{VertexSize};
+
+  // ?
   sycl::buffer<int> forward{VertexSize};
   sycl::buffer<int> backward{VertexSize};
 
   {
     const auto dwrite_t = sycl::access::mode::discard_write;
     auto base_i = base.get_access<dwrite_t>();
+    auto inb_i = inb.get_access<dwrite_t>();
     auto forward_i = forward.get_access<dwrite_t>();
     auto backward_i = backward.get_access<dwrite_t>();
     for (int i = 0; i < graph.vertexNum; i++) {
-      base_i[i] = -1;
+      base_i[i] = i;
+      inb_i[i] = false;
       forward_i[i] = -1;
       backward_i[i] = -1;
     }
@@ -232,19 +238,7 @@ int main(int argc, char *argv[]) {
     // resources.
     chrono::time_point<std::chrono::system_clock> BFS_begin, BFS_end;
     BFS_begin = std::chrono::system_clock::now(); 
-    /*
-    alternatingBFSTree(myQueue, 
-                      rows, 
-                      cols, 
-                      dist,
-                      pred,
-                      start,
-                      depth,
-                      degree,
-                      match,
-                      graph.vertexNum);
-    */
-
+ 
     alternatingBFSTree(myQueue,
                       graph,
                       currentMatchc, 
@@ -261,6 +255,7 @@ int main(int argc, char *argv[]) {
                       base,
                       forward,
                       backward,
+                      inb,
                       graph.vertexNum);
 
     BFS_end = std::chrono::system_clock::now(); 
