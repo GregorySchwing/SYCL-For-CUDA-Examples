@@ -990,19 +990,35 @@ bool contract_blossoms(sycl::queue &q,
                             parent_v = pred_i[curr_v];
                             //printf("curr_u %u curr_v %u base %u base %u\n", curr_u,curr_v,base,base);
                         }
-                        auto base_u = base_i[curr_u];
-                        auto curr_ut = base_u;
-                        printf("u %u base_u %d\n", src, base_u);
-                        while(for_i[curr_ut] != base_u){
-                            printf("%d -> %d\n", curr_ut, for_i[curr_ut]);
-                            curr_ut = for_i[curr_ut];
-                        }
+
 
     });
     };
     q.submit(cg8);
+        // Color vertices
+        // Request vertices - one workitem per workgroup
+        // Command Group creation
+        auto cg = [&](sycl::handler &h) {    
+            const auto read_t = sycl::access::mode::read;
 
+            // dist
+            auto base_i = base.get_access<read_write_t>(h);
+            auto for_i = forward.get_access<write_t>(h);
 
+            h.parallel_for(VertexSize,
+                            [=](sycl::id<1> i) { 
+                if (base_i[i] != i)
+                    return;
+                auto base_u = base_i[i];
+                auto curr_ut = base_u;
+                printf("u %u base_u %d\n", src, base_u);
+                while(for_i[curr_ut] != base_u){
+                    printf("%d -> %d\n", curr_ut, for_i[curr_ut]);
+                    curr_ut = for_i[curr_ut];
+                }
+
+            });
+    };
     {
         const auto read_t = sycl::access::mode::read;
         auto km = keepMatching.get_access<read_t>();
