@@ -160,7 +160,7 @@ int main(int argc, char *argv[]) {
 	elapsed_seconds_max = nd_item_initial_match_end - nd_item_initial_match_begin; 
 
 
-
+  #ifdef NDEBUG
   {
     const auto read_t = sycl::access::mode::read;
     const auto write_t = sycl::access::mode::write;
@@ -181,6 +181,7 @@ int main(int argc, char *argv[]) {
       exit(1);
     }
   }
+  #endif
 
   printf("\nElapsed Time for SYCL NDItem Initial Max Match: %f\n",elapsed_seconds_max.count());
   printf("SYCL initial match count is: %u\n", nditem_syclinitmatchc/2);
