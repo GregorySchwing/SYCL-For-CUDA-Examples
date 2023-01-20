@@ -371,11 +371,11 @@ void alternatingBFSTree(sycl::queue &q,
                                 if (base_i[col] != -1){
                                   auto base = base_i[col];
                                   auto curr_u = col;
-                                  //while(for_i[curr_u] != base){
-                                  //  dist_i[curr_u] = dist_i[src] + 1;
-                                  //  pred_i[curr_u] = src;
-                                  //  curr_u = for_i[curr_u];
-                                  //}
+                                  do{
+                                    dist_i[curr_u] = dist_i[src] + 1;
+                                    pred_i[curr_u] = src;
+                                    curr_u = for_i[curr_u];
+                                  } while(curr_u != base);
                                 }
                               }
                           }
@@ -389,13 +389,13 @@ void alternatingBFSTree(sycl::queue &q,
                               expanded_i[0] = 1;
                               // This is a blossom vertex.  Write to all the entries.
                               if (base_i[col] != -1){
-                                auto base = base_i[col];
-                                auto curr_u = col;
-                                  //while(for_i[curr_u] != base){
-                                  //  dist_i[curr_u] = dist_i[src] + 1;
-                                  //  pred_i[curr_u] = src;
-                                  //  curr_u = for_i[curr_u];
-                                  //}
+                                  auto base = base_i[col];
+                                  auto curr_u = col;
+                                  do{
+                                    dist_i[curr_u] = dist_i[src] + 1;
+                                    pred_i[curr_u] = src;
+                                    curr_u = for_i[curr_u];
+                                  } while(curr_u != base);
                               }
                           }
                         }       
