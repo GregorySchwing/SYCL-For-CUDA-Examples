@@ -238,7 +238,6 @@ int main(int argc, char *argv[]) {
     // resources.
     chrono::time_point<std::chrono::system_clock> BFS_begin, BFS_end;
     BFS_begin = std::chrono::system_clock::now(); 
- 
     alternatingBFSTree(myQueue,
                       graph,
                       currentMatchc, 
@@ -257,6 +256,26 @@ int main(int argc, char *argv[]) {
                       backward,
                       inb,
                       graph.vertexNum);
+    /*
+    testAlternatingBFSTree(myQueue,
+                      graph,
+                      currentMatchc, 
+                      rows, 
+                      cols, 
+                      dist,
+                      pred,
+                      start,
+                      degree,
+                      match,
+                      requests,
+                      matchable,
+                      bridgeVertex,
+                      base,
+                      forward,
+                      backward,
+                      inb,
+                      graph.vertexNum);
+    */
 
     BFS_end = std::chrono::system_clock::now(); 
     elapsed_seconds_max = BFS_end - BFS_begin; 
