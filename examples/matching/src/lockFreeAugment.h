@@ -1011,7 +1011,7 @@ bool contract_blossoms(sycl::queue &q,
                     return;
                 auto base_u = base_i[i];
                 auto curr_ut = base_u;
-                printf("u %u base_u %d\n", src, base_u);
+                printf("u %u base_u %d\n", i[0], base_u);
                 while(for_i[curr_ut] != base_u){
                     printf("%d -> %d\n", curr_ut, for_i[curr_ut]);
                     curr_ut = for_i[curr_ut];
