@@ -1252,20 +1252,25 @@ bool contract_blossoms(sycl::queue &q,
         auto parent_v = pred_i[curr_v];
         out << "finding base   " << curr_u << "-" << parent_u  <<  cl::sycl::endl;
         out << "finding base   " << curr_v << "-" << parent_v  <<  cl::sycl::endl;
-        for_i[curr_u]=curr_v;
-        back_i[curr_v]=curr_u;
+        back_i[curr_u]=curr_v;
+        for_i[curr_v]=curr_u;
 
         while(curr_u != curr_v){
             out << "finding base   " << curr_u << "-" << parent_u  <<  cl::sycl::endl;
             out << "finding base   " << curr_v << "-" << parent_v  <<  cl::sycl::endl;
 
-            back_i[curr_u]=parent_u;
-            for_i[curr_v]=parent_v;
+            for_i[curr_u]=parent_u;
+            back_i[parent_u]=curr_u;
+
+            for_i[parent_v]=curr_v;
+            back_i[curr_v]=parent_v;
+
             curr_u  = parent_u;
             curr_v  = parent_v;
             parent_u = pred_i[curr_u];
             parent_v = pred_i[curr_v];
-
+            back_i[curr_u]=parent_u;
+            for_i[curr_v]=parent_v;
             //printf("curr_u %u curr_v %u parent_u %u parent_v %u\n", curr_u,curr_v,parent_u,parent_v);
         }
 
@@ -1317,7 +1322,7 @@ bool contract_blossoms(sycl::queue &q,
                 out << "u " << i[0] << " base_u " << base_u  <<  cl::sycl::endl;
                 while(for_i[curr_ut] != base_u && for_i[curr_ut] != -1){
                     //printf("%d -> %d\n", curr_ut, for_i[curr_ut]);
-                        out << curr_ut << "->" << curr_ut  <<  cl::sycl::endl;
+                        out << curr_ut << "->" << for_i[curr_ut]  <<  cl::sycl::endl;
 
                     curr_ut = for_i[curr_ut];
                 }
