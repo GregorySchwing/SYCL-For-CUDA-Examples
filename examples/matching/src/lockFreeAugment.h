@@ -777,7 +777,7 @@ void augment_trivial_paths(sycl::queue &q,
 // 
 // The maximal matching is performed on the set of blossom bridge vertices.
 // An additional kernel to identify the base     then update the base of all blossom vertices.
-bool contract_blossoms(sycl::queue &q, 
+bool contract_blossoms_2(sycl::queue &q, 
                 int & matchCount,
                 sycl::buffer<uint32_t> &rows, 
                 sycl::buffer<uint32_t> &cols, 
@@ -825,11 +825,13 @@ bool contract_blossoms(sycl::queue &q,
     const auto dwrite_t = sycl::access::mode::discard_write;
     const auto read_t = sycl::access::mode::read;
     const auto write_t = sycl::access::mode::write;
+    auto b_i = bridgeVertex.get_access<dwrite_t>(h);
 
     auto matchable_i = matchable.get_access<dwrite_t>(h);
     h.parallel_for(VertexSize,
                     [=](sycl::id<1> i) { 
         matchable_i[i] = false;
+        b_i[i]=0;
     });
     };
     q.submit(cg);
@@ -957,7 +959,7 @@ bool contract_blossoms(sycl::queue &q,
                         size_t blockDim = ra[0];
                         size_t threadIdx = item.get_local_id();
                         auto srcStart = start_i[src];
-                        if (!matchable_i[src] || dist_i[src] == 0)
+                        if (!matchable_i[src] || dist_i[src] == 0 || b_i[srcStart] == 0)
                             return; 
 
                         auto edgePair = b_i[srcStart];
@@ -974,6 +976,8 @@ bool contract_blossoms(sycl::queue &q,
                             uint32_t curr_v = mostSignificantWord;
                             auto parent_u = pred_i[curr_u];
                             auto parent_v = pred_i[curr_v];
+                            out << "finding base   " << curr_u << "-" << parent_u  <<  cl::sycl::endl;
+                            out << "finding base   " << curr_v << "-" << parent_v  <<  cl::sycl::endl;
                             for_i[curr_u]=curr_v;
                             back_i[curr_v]=curr_u;
 
@@ -1014,6 +1018,7 @@ bool contract_blossoms(sycl::queue &q,
 
     });
     };
+    fflush(stdout);
     q.submit(cg8);
         // Color vertices
         // Request vertices - one workitem per workgroup
@@ -1050,5 +1055,207 @@ bool contract_blossoms(sycl::queue &q,
         return km[0];
     }
 }
+
+bool contract_blossoms(sycl::queue &q, 
+                int & matchCount,
+                sycl::buffer<uint32_t> &rows, 
+                sycl::buffer<uint32_t> &cols, 
+                sycl::buffer<uint64_t> &bridgeVertex, 
+                sycl::buffer<int> &pred,
+                sycl::buffer<int> &dist,
+                sycl::buffer<int> &start,
+                sycl::buffer<int> &depth,
+                sycl::buffer<int> &match,
+                sycl::buffer<int> &requests,
+                sycl::buffer<bool> &matchable,
+                sycl::buffer<int> &base,
+                sycl::buffer<int> &forward,
+                sycl::buffer<int> &backward,
+                const int vertexNum){
+
+
+    constexpr const size_t SingletonSz = 1;
+    const sycl::range Singleton{SingletonSz};
+
+    constexpr const size_t TripletonSz = 3;
+    const sycl::range Tripleton{TripletonSz};
+
+    const size_t numBlocks = vertexNum;
+    const sycl::range VertexSize{numBlocks};
+
+    const size_t threadsPerBlock = 32;
+    const size_t totalThreads = numBlocks * threadsPerBlock;
+
+    const sycl::range NumWorkItems{totalThreads};
+    const sycl::range WorkGroupSize{threadsPerBlock};
+  
+    sycl::buffer<bool> keepMatching{Singleton};
+    sycl::buffer<unsigned int> selectBarrier {Singleton};
+    sycl::buffer<unsigned int> colsum {Tripleton};
+
+    // Initialize input data
+    {
+        const auto write_t = sycl::access::mode::write;
+        auto km = keepMatching.get_access<write_t>();
+        km[0] = false;
+    }
+
+    auto cg = [&](sycl::handler &h) {    
+    const auto dwrite_t = sycl::access::mode::discard_write;
+    const auto read_t = sycl::access::mode::read;
+    const auto write_t = sycl::access::mode::write;
+    auto b_i = bridgeVertex.get_access<dwrite_t>(h);
+
+    auto matchable_i = matchable.get_access<dwrite_t>(h);
+    h.parallel_for(VertexSize,
+                    [=](sycl::id<1> i) { 
+        matchable_i[i] = false;
+        b_i[i]=0;
+    });
+    };
+    q.submit(cg);
+
+    // Command Group creation
+    // sets vertices in this next frontier which can augment/blossom and thus terminate.
+    auto cg4 = [&](sycl::handler &h) { 
+    const auto read_t = sycl::access::mode::read;
+    const auto write_t = sycl::access::mode::write;
+    const auto read_write_t = sycl::access::mode::read_write;
+
+    auto km = keepMatching.get_access<write_t>(h);
+
+    auto rows_i = rows.get_access<read_t>(h);
+    auto cols_i = cols.get_access<read_t>(h);
+    auto depth_i = depth.get_access<read_t>(h);
+    auto match_i = match.get_access<read_t>(h);
+    auto matchable_i = matchable.get_access<write_t>(h);
+
+    //auto b_i = bridgeVertex.get_access<write_t>(h);
+    auto start_i = start.get_access<read_t>(h);
+    auto b_i = bridgeVertex.get_access<write_t>(h);
+
+    auto dist_i = dist.get_access<read_t>(h);
+    auto pred_i = pred.get_access<read_t>(h);
+    sycl::stream out(1024, 256, h);
+
+    h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
+                        sycl::group<1> gr = item.get_group();
+                        sycl::range<1> r = gr.get_local_range();
+                        size_t src = gr.get_group_linear_id();
+                        size_t blockDim = r[0];
+                        size_t threadIdx = item.get_local_id();
+                        
+                        //printf("src %lu dist %d depth %d start %d\n", src, dist_i[src], depth_i[0], start_i[src]);
+
+                        // Not a new frontier vertex with an unmatched src.
+                        // It's very important that src is unmatched, since this is called after augment_paths.
+                        if (dist_i[src] != (depth_i[0]+1)  || match_i[start_i[src]] >= 4) return;
+                        //printf("possible to color the src in %lu\n", src);
+                        // If you win the first race, you make sure you get written in your slot then return.
+                        //sycl::atomic_ref<uint64_t, sycl::memory_order::relaxed, sycl::memory_scope::device, 
+                        //sycl::access::address_space::global_space> ref_b_src(b_i[start_i[src]]);
+
+                        // A bridge is an unmatched edge between two even levels
+                        if ((depth_i[0]+1) % 2 == 0){
+                        for (auto col_index = rows_i[src]; col_index < rows_i[src+1]; ++col_index){
+                        //for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){                            
+                            auto col = cols_i[col_index];
+                            // An edge to a vertex in my even level.
+                            if (dist_i[col] == dist_i[src]){
+                                // If you win the first race, you make sure you get written in your slot then return. 
+                                if (match_i[start_i[col]] < 4){   
+                                    // Detect blossoms
+                                    if(start_i[src] == start_i[col]){
+                                        matchable_i[start_i[src]] = true;
+                                        matchable_i[src] = true;
+                                        matchable_i[col] = true;
+                                        uint32_t leastSignificantWord = src;
+                                        uint32_t mostSignificantWord = col;
+                                        uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
+                                        b_i[start_i[src]] = edgePair;
+                                        out << "Blossom bridge pair   " << src << "-" << col  <<  cl::sycl::endl;
+                                        km[0] = true;
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                        } else {
+                        for (auto col_index = rows_i[src]; col_index < rows_i[src+1]; ++col_index){
+                        //for (auto col_index = rows_i[src] + threadIdx; col_index < rows_i[src+1]; col_index+=blockDim){
+                            auto col = cols_i[col_index];
+                            // A matched edge to a vertex in my odd level.
+                            if (match_i[col] == match_i[src] &&
+                                dist_i[col] == dist_i[src]){
+                                // If you win the first race, you make sure you get written in your slot then return.      
+                                // Detect blossoms
+                                if(start_i[src] == start_i[col]){
+                                    matchable_i[start_i[src]] = true;
+                                    matchable_i[src] = true;
+                                    matchable_i[col] = true;
+                                    uint32_t leastSignificantWord = src;
+                                    uint32_t mostSignificantWord = col;
+                                    uint64_t edgePair = (uint64_t) mostSignificantWord << 32 | leastSignificantWord;
+                                    b_i[start_i[src]] = edgePair;
+                                    //printf("Blossom bridge pair %lu %u\n", src, col);
+                                    out << "Blossom bridge pair   " << src << "-" << col  <<  cl::sycl::endl;
+                                    km[0] = true;
+                                    return;
+                                }
+                            }
+                        }
+                        }       
+    });
+    };
+    q.submit(cg4);
+    fflush(stdout);
+
+
+    auto cg5 = [&](sycl::handler &h) {    
+    const auto read_t = sycl::access::mode::read;
+    const auto write_t = sycl::access::mode::write;
+    const auto read_write_t = sycl::access::mode::read_write;
+
+    auto km = keepMatching.get_access<write_t>(h);
+
+    auto rows_i = rows.get_access<read_t>(h);
+    auto cols_i = cols.get_access<read_t>(h);
+    auto depth_i = depth.get_access<read_t>(h);
+    auto match_i = match.get_access<read_t>(h);
+    auto matchable_i = matchable.get_access<write_t>(h);
+
+    //auto b_i = bridgeVertex.get_access<write_t>(h);
+    auto start_i = start.get_access<read_t>(h);
+    auto b_i = bridgeVertex.get_access<write_t>(h);
+
+    auto dist_i = dist.get_access<read_t>(h);
+    auto pred_i = pred.get_access<read_t>(h);
+    sycl::stream out(1024, 256, h);
+
+    h.parallel_for(VertexSize,
+                    [=](sycl::id<1> i) { 
+        if (!matchable_i[i] || dist_i[i] != 0 || b_i[i] == 0)
+            return; 
+
+        auto edgePair = b_i[i];
+        uint32_t leastSignificantWord = (uint32_t)edgePair;
+        uint32_t mostSignificantWord = (edgePair >> 32);
+        out << "Contracting Blossom bridge pair   " << leastSignificantWord << "-" << mostSignificantWord  <<  cl::sycl::endl;
+
+        //if (leastSignificantWord != src && mostSignificantWord != src)
+
+    });
+    };
+    q.submit(cg5);
+    fflush(stdout);
+
+
+    {
+        const auto read_t = sycl::access::mode::read;
+        auto km = keepMatching.get_access<read_t>();
+        return km[0];
+    }
+}
+
 
 #endif
