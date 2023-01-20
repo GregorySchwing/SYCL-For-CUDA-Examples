@@ -242,7 +242,6 @@ void alternatingBFSTree(sycl::queue &q,
                                 out << "Augmenting a trivial path from " << src << " through blossom vertex " << pred_i[u] << cl::sycl::endl;
                                 exit(1);
                               }
-
                             }
                             out << "Augmented trivial path from " << src << " to " << v << cl::sycl::endl;
                           }

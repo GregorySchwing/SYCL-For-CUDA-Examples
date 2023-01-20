@@ -106,6 +106,7 @@ int main(int argc, char *argv[]) {
   // This kernel is fine as is for use in a search tree. 
   // Each subkernel should be logically kernelized by available
   // resources.
+  /*
   chrono::time_point<std::chrono::system_clock> initial_match_begin, initial_match_end;
   initial_match_begin = std::chrono::system_clock::now(); 
   int syclinitmatchc;
@@ -143,7 +144,7 @@ int main(int argc, char *argv[]) {
 
   printf("\nElapsed Time for SYCL Initial Max Match: %f\n",elapsed_seconds_max.count());
   printf("SYCL initial match count is: %u\n", syclinitmatchc/2);
-
+  */
   chrono::time_point<std::chrono::system_clock> nd_item_initial_match_begin, nd_item_initial_match_end;
   nd_item_initial_match_begin = std::chrono::system_clock::now(); 
   int nditem_syclinitmatchc;
