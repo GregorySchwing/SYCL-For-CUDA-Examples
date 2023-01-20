@@ -144,7 +144,7 @@ void alternatingBFSTree(sycl::queue &q,
       auto rows_i = rows.get_access<read_t>(h);
       auto cols_i = cols.get_access<read_t>(h);
       auto depth_i = depth.get_access<read_t>(h);
-      auto match_i = match.get_access<read_t>(h);
+      auto match_i = match.get_access<read_write_t>(h);
 
       auto expanded_i = expanded.get_access<write_t>(h);
       auto dist_i = dist.get_access<read_write_t>(h);
@@ -153,6 +153,7 @@ void alternatingBFSTree(sycl::queue &q,
       auto for_i = forward.get_access<read_t>(h);
       auto start_i = start.get_access<read_t>(h);
       auto inb_i = inb.get_access<read_t>(h);
+      sycl::stream out(1024, 256, h);
 
       h.parallel_for(sycl::nd_range<1>{NumWorkItems, WorkGroupSize}, [=](sycl::nd_item<1> item) {
                         sycl::group<1> gr = item.get_group();
@@ -220,9 +221,25 @@ void alternatingBFSTree(sycl::queue &q,
                               }
                           }
                         // Odd level and an unmatched vertex.
+                        // Blossoms will never be the tail end of a trivial augmenting path.
+                        // Thus base_i isnt necessary.
                         } else {
+                          out << "Found a trivial path from " << src << " to " << start_i[src] << cl::sycl::endl;
                           // trivial augmenting path. consider doing augmenting here.
-
+                          sycl::atomic_ref<int, sycl::memory_order::acq_rel, sycl::memory_scope::device, sycl::access::address_space::global_space> match_src(match_i[start_i[src]]);
+                          int unmatched = 2;
+                          if(match_src.compare_exchange_strong(unmatched, 3, sycl::memory_order::acquire,sycl::memory_order::acquire)){
+                            int u=src,v,w;
+                            while (u!=-1)
+                            {
+                              v=pred_i[u];
+                              w=match_i[v]-4;
+                              match_i[v]=4+u;
+                              match_i[u]=4+v;
+                              u=w;
+                            }
+                            out << "Augmented trivial path from " << src << " to " << v << cl::sycl::endl;
+                          }
                         }
       });
     };
