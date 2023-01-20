@@ -1230,6 +1230,10 @@ bool contract_blossoms(sycl::queue &q,
 
     auto dist_i = dist.get_access<read_t>(h);
     auto pred_i = pred.get_access<read_t>(h);
+
+    auto base_i = base.get_access<write_t>(h);
+    auto for_i = forward.get_access<write_t>(h);
+    auto back_i = backward.get_access<write_t>(h);
     sycl::stream out(1024, 256, h);
 
     h.parallel_for(VertexSize,
@@ -1242,14 +1246,86 @@ bool contract_blossoms(sycl::queue &q,
         uint32_t mostSignificantWord = (edgePair >> 32);
         out << "Contracting Blossom bridge pair   " << leastSignificantWord << "-" << mostSignificantWord  <<  cl::sycl::endl;
 
+        uint32_t curr_u = leastSignificantWord;
+        uint32_t curr_v = mostSignificantWord;
+        auto parent_u = pred_i[curr_u];
+        auto parent_v = pred_i[curr_v];
+        out << "finding base   " << curr_u << "-" << parent_u  <<  cl::sycl::endl;
+        out << "finding base   " << curr_v << "-" << parent_v  <<  cl::sycl::endl;
+        for_i[curr_u]=curr_v;
+        back_i[curr_v]=curr_u;
+
+        while(curr_u != curr_v){
+            out << "finding base   " << curr_u << "-" << parent_u  <<  cl::sycl::endl;
+            out << "finding base   " << curr_v << "-" << parent_v  <<  cl::sycl::endl;
+
+            back_i[curr_u]=parent_u;
+            for_i[curr_v]=parent_v;
+            curr_u  = parent_u;
+            curr_v  = parent_v;
+            parent_u = pred_i[curr_u];
+            parent_v = pred_i[curr_v];
+
+            //printf("curr_u %u curr_v %u parent_u %u parent_v %u\n", curr_u,curr_v,parent_u,parent_v);
+        }
+
+        auto base = curr_u;
+        base_i[base] = base;
+
+        curr_u = leastSignificantWord;
+        curr_v = mostSignificantWord;
+        parent_u = pred_i[curr_u];
+        parent_v = pred_i[curr_v];
+        while(curr_u != curr_v){
+            out << "setting base   " << curr_u << "-" << parent_u  <<  cl::sycl::endl;
+            out << "setting base   " << curr_v << "-" << parent_v  <<  cl::sycl::endl;
+            
+            base_i[curr_u]=base;
+            base_i[curr_v]=base;
+            curr_u  = parent_u;
+            curr_v  = parent_v;
+            parent_u = pred_i[curr_u];
+            parent_v = pred_i[curr_v];
+//printf("curr_u %u curr_v %u base %u base %u\n", curr_u,curr_v,base,base);
+        }
+                        
         //if (leastSignificantWord != src && mostSignificantWord != src)
 
     });
     };
+
     q.submit(cg5);
     fflush(stdout);
+        // Color vertices
+        // Request vertices - one workitem per workgroup
+        // Command Group creation
+        auto cg9 = [&](sycl::handler &h) {    
+            const auto read_t = sycl::access::mode::read;
+            sycl::stream out(1024, 256, h);
 
+            // dist
+            auto base_i = base.get_access<read_t>(h);
+            auto for_i = forward.get_access<read_t>(h);
 
+            h.parallel_for(VertexSize,
+                            [=](sycl::id<1> i) { 
+                if (base_i[i] != i)
+                    return;
+                auto base_u = base_i[i];
+                auto curr_ut = base_u;
+                //printf("u %u base_u %d\n", i[0], base_u);
+                out << "u " << i[0] << " base_u " << base_u  <<  cl::sycl::endl;
+                while(for_i[curr_ut] != base_u && for_i[curr_ut] != -1){
+                    //printf("%d -> %d\n", curr_ut, for_i[curr_ut]);
+                        out << curr_ut << "->" << curr_ut  <<  cl::sycl::endl;
+
+                    curr_ut = for_i[curr_ut];
+                }
+
+            });
+    };
+    q.submit(cg9);
+    fflush(stdout);
     {
         const auto read_t = sycl::access::mode::read;
         auto km = keepMatching.get_access<read_t>();
