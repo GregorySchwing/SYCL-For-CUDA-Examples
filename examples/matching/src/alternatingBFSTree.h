@@ -232,11 +232,17 @@ void alternatingBFSTree(sycl::queue &q,
                             int u=src,v,w;
                             while (u!=-1)
                             {
-                              v=pred_i[u];
-                              w=match_i[v]-4;
-                              match_i[v]=4+u;
-                              match_i[u]=4+v;
-                              u=w;
+                              if(!inb_i[pred_i[u]]){
+                                v=pred_i[u];
+                                w=match_i[v]-4;
+                                match_i[v]=4+u;
+                                match_i[u]=4+v;
+                                u=w;
+                              } else {
+                                out << "Augmenting a trivial path from " << src << " through blossom vertex " << pred_i[u] << cl::sycl::endl;
+                                exit(1);
+                              }
+
                             }
                             out << "Augmented trivial path from " << src << " to " << v << cl::sycl::endl;
                           }
