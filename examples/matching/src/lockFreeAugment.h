@@ -996,6 +996,8 @@ bool contract_blossoms_2(sycl::queue &q,
                             }
 
                             auto base = curr_u;
+                            out << "base is  " << base <<  cl::sycl::endl;
+
                             base_i[base] = base;
 
                             curr_u = leastSignificantWord;
@@ -1025,7 +1027,7 @@ bool contract_blossoms_2(sycl::queue &q,
         // Command Group creation
         auto cg9 = [&](sycl::handler &h) {    
             const auto read_t = sycl::access::mode::read;
-    sycl::stream out(1024, 256, h);
+            sycl::stream out(1024, 256, h);
 
             // dist
             auto base_i = base.get_access<read_t>(h);
@@ -1267,15 +1269,15 @@ bool contract_blossoms(sycl::queue &q,
 
             curr_u  = parent_u;
             curr_v  = parent_v;
+
             parent_u = pred_i[curr_u];
             parent_v = pred_i[curr_v];
-            back_i[curr_u]=parent_u;
-            for_i[curr_v]=parent_v;
             //printf("curr_u %u curr_v %u parent_u %u parent_v %u\n", curr_u,curr_v,parent_u,parent_v);
         }
 
         auto base = curr_u;
         base_i[base] = base;
+        out << "setting base   " << base  << "base[" << base << "] = " << base_i[base] <<  cl::sycl::endl;
 
         curr_u = leastSignificantWord;
         curr_v = mostSignificantWord;
@@ -1301,33 +1303,35 @@ bool contract_blossoms(sycl::queue &q,
 
     q.submit(cg5);
     fflush(stdout);
-        // Color vertices
-        // Request vertices - one workitem per workgroup
-        // Command Group creation
-        auto cg9 = [&](sycl::handler &h) {    
-            const auto read_t = sycl::access::mode::read;
-            sycl::stream out(1024, 256, h);
+    // Color vertices
+    // Request vertices - one workitem per workgroup
+    // Command Group creation
+    auto cg9 = [&](sycl::handler &h) {    
+        const auto read_t = sycl::access::mode::read;
+        sycl::stream out(1024, 256, h);
 
-            // dist
-            auto base_i = base.get_access<read_t>(h);
-            auto for_i = forward.get_access<read_t>(h);
+        // dist
+        auto base_i = base.get_access<read_t>(h);
+        auto for_i = forward.get_access<read_t>(h);
+        auto matchable_i = matchable.get_access<read_t>(h);
+        auto start_i = start.get_access<read_t>(h);
 
-            h.parallel_for(VertexSize,
-                            [=](sycl::id<1> i) { 
-                if (base_i[i] != i)
-                    return;
-                auto base_u = base_i[i];
-                auto curr_ut = base_u;
-                //printf("u %u base_u %d\n", i[0], base_u);
-                out << "u " << i[0] << " base_u " << base_u  <<  cl::sycl::endl;
-                while(for_i[curr_ut] != base_u && for_i[curr_ut] != -1){
-                    //printf("%d -> %d\n", curr_ut, for_i[curr_ut]);
-                        out << curr_ut << "->" << for_i[curr_ut]  <<  cl::sycl::endl;
+        h.parallel_for(VertexSize,
+                        [=](sycl::id<1> i) { 
+            if (base_i[i] != i || !matchable_i[start_i[i]])
+                return;
+            auto base_u = base_i[i];
+            auto curr_ut = base_u;
+            //printf("u %u base_u %d\n", i[0], base_u);
+            out << "u " << i[0] << " base_u " << base_u  <<  cl::sycl::endl;
+            do {
+                //printf("%d -> %d\n", curr_ut, for_i[curr_ut]);
+                    out << curr_ut << "->" << for_i[curr_ut]  <<  cl::sycl::endl;
 
-                    curr_ut = for_i[curr_ut];
-                }
+                curr_ut = for_i[curr_ut];
+            }while(curr_ut != base_u && for_i[curr_ut] != -1);
 
-            });
+        });
     };
     q.submit(cg9);
     fflush(stdout);
