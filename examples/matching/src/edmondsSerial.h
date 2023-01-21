@@ -100,6 +100,8 @@ void EdmondsSerial::mark_blossom(int lca,int u)
 void EdmondsSerial::blossom_contraction(int s,int u,int v)
 {
   int lca=LCA(s,u,v);
+  printf("Calling BC s %d u %d v %d LCA %d\n",s,u,v,lca);
+
   memset(inb,0,V*sizeof(bool));
   mark_blossom(lca,u);
   mark_blossom(lca,v);

@@ -1218,8 +1218,8 @@ bool contract_blossoms(sycl::queue &q,
                                     out << "contracting blossom bridge pair   " << base_src << "-" << base_col << " srced at " << start_i[base_src] <<  cl::sycl::endl;
                                     uint32_t curr_u = base_src;
                                     uint32_t curr_v = base_col;
-                                    auto parent_u = pred_i[curr_u];
-                                    auto parent_v = pred_i[curr_v];
+                                    auto parent_u = base_i[pred_i[curr_u]];
+                                    auto parent_v = base_i[pred_i[curr_v]];
                                     out << "finding base   " << curr_u << "-" << parent_u  <<  cl::sycl::endl;
                                     out << "finding base   " << curr_v << "-" << parent_v  <<  cl::sycl::endl;
                                     back_i[curr_u]=curr_v;

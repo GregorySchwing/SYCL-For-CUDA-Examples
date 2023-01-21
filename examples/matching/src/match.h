@@ -338,7 +338,8 @@ void maximalMatchingNDItem(sycl::queue &q,
                 sycl::buffer<int> &requests,
                 sycl::buffer<int> &match,
                 const size_t vertexNum,
-                const unsigned int barrier = 0x88B81733){
+                const unsigned int barrier = 0x88B81733,
+                const unsigned int seed = 0){
 
   constexpr const size_t SingletonSz = 1;
   const sycl::range Singleton{SingletonSz};
@@ -360,7 +361,8 @@ void maximalMatchingNDItem(sycl::queue &q,
 
   const sycl::range NumWorkItems{totalThreads};
   const sycl::range WorkGroupSize{threadsPerBlock};
-
+  // set seed
+  srand(seed);  
   // Initialize input data
   {
     const auto read_t = sycl::access::mode::read;
@@ -671,10 +673,12 @@ void maximalMatchingNDItem(sycl::queue &q,
         cs[2] = 0;
 
         for (int i = 0; i < vertexNum; i++) {
-            if(m[i] < 4)
+            if(m[i] < 4){
                 ++cs[m[i]];
-            else if(m[i] >= 4)
+            }else if(m[i] >= 4){
                 ++cm_i[i];
+                printf("vertex %d matched to %d\n", i, m[i]-4);
+            }
         }
         //#ifdef NDEBUG
         std::cout << "red count : " << cs[0] << std::endl;

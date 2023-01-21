@@ -379,7 +379,7 @@ void alternatingBFSTree(sycl::queue &q,
     {
       const auto read_t = sycl::access::mode::read;
       auto exp = expanded.get_access<read_t>();
-      flag = exp[0];
+      flag = exp[0] && !blossomsContracted;
     }
   } while(flag);
 
