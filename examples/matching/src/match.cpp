@@ -233,6 +233,7 @@ int main(int argc, char *argv[]) {
 
   int currentMatchc = 0, prevMatchc = 0, iteration = 0;
   currentMatchc = nditem_syclinitmatchc;
+  bool blossomContracted = false;
   do {
     prevMatchc = currentMatchc;
     // This kernel is fine as is for use in a search tree. 
@@ -240,7 +241,7 @@ int main(int argc, char *argv[]) {
     // resources.
     chrono::time_point<std::chrono::system_clock> BFS_begin, BFS_end;
     BFS_begin = std::chrono::system_clock::now(); 
-    alternatingBFSTree(myQueue,
+    blossomContracted = alternatingBFSTree(myQueue,
                       graph,
                       currentMatchc, 
                       rows, 
@@ -282,107 +283,9 @@ int main(int argc, char *argv[]) {
     BFS_end = std::chrono::system_clock::now(); 
     elapsed_seconds_max = BFS_end - BFS_begin; 
     printf("\nElapsed Time for SYCL BFS: %f\n",elapsed_seconds_max.count());
-    
-    /*
 
-    chrono::time_point<std::chrono::system_clock> augment_begin, augment_end;
-    augment_begin = std::chrono::system_clock::now(); 
-    //int syclmatchc = 0;
-
-    atomicAugment_a(myQueue, 
-              currentMatchc,
-              rows, 
-              cols, 
-              pred,
-              dist,
-              start,
-              depth,
-              match,
-              requests,
-              bridgeVertex,
-              graph.vertexNum);
-    
-    augment_end = std::chrono::system_clock::now(); 
-    elapsed_seconds_max = augment_end - augment_begin; 
-    printf("\nElapsed Time for SYCL augment_a: %f\n",elapsed_seconds_max.count());
-    printf("\nSYCL augment size: %d\n",currentMatchc/2);
-
-    chrono::time_point<std::chrono::system_clock> augment_b_begin, augment_b_end;
-    augment_b_begin = std::chrono::system_clock::now(); 
-
-    atomicAugment_b(myQueue, 
-                currentMatchc,
-                rows, 
-                cols, 
-                start,
-                pred,
-                dist,
-                match,
-                bridgeVertex,
-                graph.vertexNum);
-
-    augment_b_end = std::chrono::system_clock::now(); 
-    elapsed_seconds_max = augment_b_end - augment_b_begin; 
-    printf("\nElapsed Time for SYCL augment_b: %f\n",elapsed_seconds_max.count());
-    printf("\nSYCL augment size: %d\n",currentMatchc/2);
-    */
-
-    /*
-    // To identify one and only one Augmenting path 
-    // to use the starting v.
-    // Both of these are only neccessary in the data-parallel
-    // version.  If a single work-group performs the matching,
-    // these can be eliminated by work item synchronization.
-    sycl::buffer<int> winningAugmentingPath{VertexSize};
-    sycl::buffer<int> auxMatch{VertexSize};
-
-    // Match inside even levels > 0 to avoid race conditions
-    // in blossoms/augmenting paths.  For example consider a 
-    // cycle represented by a circular linked list of odd length n.
-    // If each vertex in the level tried creating an augmenting path 
-    // with its rightside vertex, the entire level would augment, 
-    // but at (2/3)n can be in an forest of disjoint augmenting paths.
-
-    // This kernel should be modified for use in a search tree.
-    chrono::time_point<std::chrono::system_clock> aux_matching_begin, aux_matching_end;
-    aux_matching_begin = std::chrono::system_clock::now(); 
-    maximalMatching(myQueue, 
-                    rows, 
-                    cols, 
-                    requests,
-                    match,
-                    dist,
-                    depth,
-                    auxMatch,
-                    graph.vertexNum,
-                    config.barrier);
-
-    aux_matching_end = std::chrono::system_clock::now(); 
-    elapsed_seconds_max = aux_matching_end - aux_matching_begin; 
-    printf("\nElapsed Time for SYCL Aux matching: %f\n",elapsed_seconds_max.count());
-    
-    chrono::time_point<std::chrono::system_clock> augment_begin, augment_end;
-    augment_begin = std::chrono::system_clock::now(); 
-    int syclmatchc = 0;
-    augment_a(myQueue, 
-              syclmatchc,
-              rows, 
-              cols, 
-              pred,
-              dist,
-              start,
-              depth,
-              match,
-              auxMatch,
-              winningAugmentingPath,
-              graph.vertexNum);
-    
-    augment_end = std::chrono::system_clock::now(); 
-    elapsed_seconds_max = augment_end - augment_begin; 
-    printf("\nElapsed Time for SYCL augment: %f\n",elapsed_seconds_max.count());
-    */
     printf("\nOuter Iteration %d\n",iteration++);
-  } while (prevMatchc != currentMatchc); 
+  } while (prevMatchc != currentMatchc || blossomContracted); 
 
     
 
